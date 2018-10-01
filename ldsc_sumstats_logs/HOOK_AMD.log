@@ -1,0 +1,52 @@
+*********************************************************************
+* LD Score Regression (LDSC)
+* Version 1.0.0
+* (C) 2014-2015 Brendan Bulik-Sullivan and Hilary Finucane
+* Broad Institute of MIT and Harvard / MIT Department of Mathematics
+* GNU General Public License v3
+*********************************************************************
+Call: 
+./munge_sumstats.py \
+--N-con-col Ncontrols \
+--out munged/HOOK_AMD \
+--merge-alleles ../w_hm3.snplist \
+--a1-inc  \
+--N-cas-col Ncases \
+--snp Marker \
+--sumstats Fritsche_2015_AdvancedAMD.txt.gz \
+--p GC.Pvalue 
+
+Interpreting column names as follows:
+Ncases:	Number of cases
+Ncontrols:	Number of controls
+Allele2:	Allele 2, interpreted as non-ref allele for signed sumstat.
+Allele1:	Allele 1, interpreted as ref allele for signed sumstat.
+Marker:	Variant ID (e.g., rs number)
+GC.Pvalue:	p-Value
+
+Reading list of SNPs for allele merge from ../w_hm3.snplist
+Read 1217311 SNPs for allele merge.
+Reading sumstats from Fritsche_2015_AdvancedAMD.txt.gz into memory 5000000 SNPs at a time.
+WARNING: 29 SNPs had P outside of (0,1]. The P column may be mislabeled.
+WARNING: 5 SNPs had P outside of (0,1]. The P column may be mislabeled.
+Read 12023830 SNPs from --sumstats file.
+Removed 10829490 SNPs not in --merge-alleles.
+Removed 0 SNPs with missing values.
+Removed 0 SNPs with INFO <= 0.9.
+Removed 0 SNPs with MAF <= 0.01.
+Removed 34 SNPs with out-of-bounds p-values.
+Removed 16 variants that were not SNPs or were strand-ambiguous.
+1194290 SNPs remain.
+Removed 0 SNPs with duplicated rs numbers (1194290 SNPs remain).
+Removed 0 SNPs with N < 22650.6666667 (1194290 SNPs remain).
+Removed 0 SNPs whose alleles did not match --merge-alleles (1194290 SNPs remain).
+Writing summary statistics for 1217311 SNPs (1194290 with nonmissing beta) to munged/HOOK_AMD.sumstats.gz.
+
+Metadata:
+Mean chi^2 = 1.188
+Lambda GC = 1.024
+Max chi^2 = 1348.332
+764 Genome-wide significant SNPs (some may have been removed by filtering).
+
+Conversion finished at Thu Jul 12 17:55:06 2018
+Total time elapsed: 1.0m:30.42s

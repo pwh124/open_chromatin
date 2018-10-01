@@ -1,0 +1,50 @@
+*********************************************************************
+* LD Score Regression (LDSC)
+* Version 1.0.0
+* (C) 2014-2015 Brendan Bulik-Sullivan and Hilary Finucane
+* Broad Institute of MIT and Harvard / MIT Department of Mathematics
+* GNU General Public License v3
+*********************************************************************
+Call: 
+./munge_sumstats.py \
+--out munged/HOOK_IQ \
+--merge-alleles ../w_hm3.snplist \
+--N 78308.0 \
+--a1 ref \
+--a2 alt \
+--sumstats sumstats.txt.gz \
+--ignore Zscore 
+
+Interpreting column names as follows:
+p_value:	p-Value
+rsid:	Variant ID (e.g., rs number)
+Beta:	[linear/logistic] regression coefficient (0 --> no effect; above 0 --> A1 is trait/risk increasing)
+MAF:	Allele frequency
+alt:	Allele 2, interpreted as non-ref allele for signed sumstat.
+ref:	Allele 1, interpreted as ref allele for signed sumstat.
+
+Reading list of SNPs for allele merge from ../w_hm3.snplist
+Read 1217311 SNPs for allele merge.
+Reading sumstats from sumstats.txt.gz into memory 5000000 SNPs at a time.
+Read 12104294 SNPs from --sumstats file.
+Removed 10908166 SNPs not in --merge-alleles.
+Removed 0 SNPs with missing values.
+Removed 0 SNPs with INFO <= 0.9.
+Removed 21877 SNPs with MAF <= 0.01.
+Removed 0 SNPs with out-of-bounds p-values.
+Removed 2 variants that were not SNPs or were strand-ambiguous.
+1174249 SNPs remain.
+Removed 0 SNPs with duplicated rs numbers (1174249 SNPs remain).
+Using N = 78308.0
+Median value of Beta was 0.0, which seems sensible.
+Removed 0 SNPs whose alleles did not match --merge-alleles (1174249 SNPs remain).
+Writing summary statistics for 1217311 SNPs (1174249 with nonmissing beta) to munged/HOOK_IQ.sumstats.gz.
+
+Metadata:
+Mean chi^2 = 1.302
+Lambda GC = 1.262
+Max chi^2 = 55.375
+107 Genome-wide significant SNPs (some may have been removed by filtering).
+
+Conversion finished at Thu Jun 14 13:59:33 2018
+Total time elapsed: 1.0m:44.69s

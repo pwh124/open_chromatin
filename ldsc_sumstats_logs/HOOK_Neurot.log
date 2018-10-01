@@ -1,0 +1,47 @@
+*********************************************************************
+* LD Score Regression (LDSC)
+* Version 1.0.0
+* (C) 2014-2015 Brendan Bulik-Sullivan and Hilary Finucane
+* Broad Institute of MIT and Harvard / MIT Department of Mathematics
+* GNU General Public License v3
+*********************************************************************
+Call: 
+./munge_sumstats.py \
+--out munged/HOOK_Neurot \
+--merge-alleles ../w_hm3.snplist \
+--a1-inc  \
+--snp RSID \
+--sumstats sumstats_neuroticism_ctg_format.txt.gz \
+--ignore SNP 
+
+Interpreting column names as follows:
+A1:	Allele 1, interpreted as ref allele for signed sumstat.
+P:	p-Value
+RSID:	Variant ID (e.g., rs number)
+A2:	Allele 2, interpreted as non-ref allele for signed sumstat.
+N:	Sample size
+
+Reading list of SNPs for allele merge from ../w_hm3.snplist
+Read 1217311 SNPs for allele merge.
+Reading sumstats from sumstats_neuroticism_ctg_format.txt.gz into memory 5000000 SNPs at a time.
+Read 10958177 SNPs from --sumstats file.
+Removed 9684580 SNPs not in --merge-alleles.
+Removed 108858 SNPs with missing values.
+Removed 0 SNPs with INFO <= 0.9.
+Removed 0 SNPs with MAF <= 0.01.
+Removed 0 SNPs with out-of-bounds p-values.
+Removed 207 variants that were not SNPs or were strand-ambiguous.
+1164532 SNPs remain.
+Removed 226 SNPs with duplicated rs numbers (1164306 SNPs remain).
+Removed 192 SNPs with N < 260152.0 (1164114 SNPs remain).
+Removed 306 SNPs whose alleles did not match --merge-alleles (1163808 SNPs remain).
+Writing summary statistics for 1217311 SNPs (1163808 with nonmissing beta) to munged/HOOK_Neurot.sumstats.gz.
+
+Metadata:
+Mean chi^2 = 1.812
+Lambda GC = 1.588
+Max chi^2 = 128.244
+1426 Genome-wide significant SNPs (some may have been removed by filtering).
+
+Conversion finished at Thu Jul 12 17:58:42 2018
+Total time elapsed: 1.0m:28.9s

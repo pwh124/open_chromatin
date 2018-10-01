@@ -1,0 +1,48 @@
+*********************************************************************
+* LD Score Regression (LDSC)
+* Version 1.0.0
+* (C) 2014-2015 Brendan Bulik-Sullivan and Hilary Finucane
+* Broad Institute of MIT and Harvard / MIT Department of Mathematics
+* GNU General Public License v3
+*********************************************************************
+Call: 
+./munge_sumstats.py \
+--daner  \
+--out munged/HOOK_MDD \
+--merge-alleles ../w_hm3.snplist \
+--sumstats MDD2018_ex23andMe.gz 
+
+Inferred that N_cas = 59851.0, N_con = 113154.0 from the FRQ_[A/U] columns.
+Interpreting column names as follows:
+INFO:	INFO score (imputation quality; higher --> better imputation)
+FRQ_U_113154:	Allele frequency
+A1:	Allele 1, interpreted as ref allele for signed sumstat.
+P:	p-Value
+A2:	Allele 2, interpreted as non-ref allele for signed sumstat.
+SNP:	Variant ID (e.g., rs number)
+OR:	Odds ratio (1 --> no effect; above 1 --> A1 is risk increasing)
+
+Reading list of SNPs for allele merge from ../w_hm3.snplist
+Read 1217311 SNPs for allele merge.
+Reading sumstats from MDD2018_ex23andMe.gz into memory 5000000 SNPs at a time.
+Read 13554550 SNPs from --sumstats file.
+Removed 12343318 SNPs not in --merge-alleles.
+Removed 0 SNPs with missing values.
+Removed 100533 SNPs with INFO <= 0.9.
+Removed 12196 SNPs with MAF <= 0.01.
+Removed 0 SNPs with out-of-bounds p-values.
+Removed 0 variants that were not SNPs or were strand-ambiguous.
+1098503 SNPs remain.
+Removed 0 SNPs with duplicated rs numbers (1098503 SNPs remain).
+Median value of OR was 1.0, which seems sensible.
+Removed 0 SNPs whose alleles did not match --merge-alleles (1098503 SNPs remain).
+Writing summary statistics for 1217311 SNPs (1098503 with nonmissing beta) to munged/HOOK_MDD.sumstats.gz.
+
+Metadata:
+Mean chi^2 = 1.273
+Lambda GC = 1.237
+Max chi^2 = 43.127
+113 Genome-wide significant SNPs (some may have been removed by filtering).
+
+Conversion finished at Thu Jun 14 13:46:58 2018
+Total time elapsed: 1.0m:59.23s
