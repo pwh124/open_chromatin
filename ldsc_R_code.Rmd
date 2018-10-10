@@ -1,0 +1,354 @@
+---
+title: "ldsc-analysis"
+author: "Paul Hook"
+date: "6/11/2018"
+output: html_document
+---
+
+## Script was modified to read from GitHub repository
+```{r reading in the data}
+#setting directory
+github <- "/Volumes/PAULHOOK/open_chromatin_paper/github_repo/"
+setwd(github)
+
+#load data and setting colnames
+ldsc_atac <- read.delim("ldsc_results/new_HOOK_ldsc_atac_results.txt",header = F ,sep = "\t", col.names = c("name","coefficient","coefficient_se","coefficient_p_value","gwas"))
+
+```
+
+## Formatting the data
+```{r, formatting}
+# Calculating -log10(P)
+ldsc_atac$p.log10 <- -log10(ldsc_atac$coefficient_p_value)
+
+# 2 step cleaning of GWAS names
+ldsc_atac$gwas_clean <- gsub("_Hook_ATAC.cell_type_results.txt","",ldsc_atac$gwas)
+ldsc_atac$trait <- gsub("new_HOOK_","",ldsc_atac$gwas_clean)
+
+# Arranging the columns how I want them and ordering the cell populations
+library(tidyverse)
+clean.ldsc_atac <- ldsc_atac %>% 
+  dplyr::select(cell_name = name, coefficient, coefficient_se, coefficient_p_value,p.log10,gwas = trait) %>% as_tibble()
+clean.ldsc_atac$gwas <- as_factor(clean.ldsc_atac$gwas)
+clean.ldsc_atac$cell_ordered <- factor(clean.ldsc_atac$cell_name, c("Microglia_adult","Microglia_single-cell","Astrocytes_single-cell","Oligodendrocyte_single-cell","Neun-neg","Excitatory_cortical","Cux2_layer2-3_cortical","Scnn1a_layer4_cortical","Rbp4_layer5_cortical","Ex3_single-cell","Ntsr1_layer6_cortical","Ex1_single-cell","Ex2_single-cell","Gad2_GABA_cortical","Inhib1_single-cell","Pv_GABA_cortical","Vip_GABA_cortical","Inhib2_single-cell","DA_FB","DA_MB","Blue_cone","Green_cone","Rod","CD4_tcells","CD8_tcells"))
+
+# Changing the names of the cell populations to publication names
+library(plyr)
+clean.ldsc_atac$cell_ordered2 <- mapvalues(clean.ldsc_atac$cell_ordered,from=c("Microglia_adult","Microglia_single-cell","Astrocytes_single-cell","Oligodendrocyte_single-cell","Neun-neg","Excitatory_cortical","Cux2_layer2-3_cortical","Scnn1a_layer4_cortical","Rbp4_layer5_cortical","Ex3_single-cell","Ntsr1_layer6_cortical","Ex1_single-cell","Ex2_single-cell","Gad2_GABA_cortical","Inhib1_single-cell","Pv_GABA_cortical","Vip_GABA_cortical","Inhib2_single-cell","DA_FB","DA_MB","Blue_cone","Green_cone","Rod","CD4_tcells","CD8_tcells"),to=c("Microglia","Microglia*","Astrocytes*","Oligodendrocyte*","Neun (-ve)","Excitatory Camk2a (+ve)","Excitatory LII/III","Excitatory LIV","Excitatory LV","Excitatory LII-V*","Excitatory LVI","Excitatory LVI*","Excitatory DG*","Inhibitory Gad2 (+ve)","Inhibitory*","Inhibitory PV","Inhibitory  VIP","Inhibitory MSN*","DA FB","DA MB","Cones (blue)","Cones (green)","Rods","CD4+ T-cells","CD8+ T-cells"))
+
+# Assigning broader cell type designations to the cells
+clean.ldsc_atac.types <- clean.ldsc_atac %>%
+  dplyr::mutate(type = if_else(grepl("microglia|astrocytes|oligo|neun",cell_ordered,ignore.case = T),"Glia",
+                               if_else(grepl("ex|cux2|scnn1a|rbp4|ntsr1",cell_ordered,ignore.case = T),"Excitatory neurons",
+                                       if_else(grepl("inhib|gaba",cell_ordered,ignore.case = T),"Inhibitory neurons",
+                                              if_else(grepl("da_fb|da_mb",cell_ordered,ignore.case = T),"Dopaminergic neurons",
+                                                      if_else(grepl("blue|green|rod",cell_ordered,ignore.case = T),"Retina cells",
+                                                              if_else(grepl("cd4|cd8",cell_ordered,ignore.case = T),"T-cells","NA")))))))
+
+clean.ldsc_atac.types$type <- factor(clean.ldsc_atac.types$type, levels=c("Glia","Excitatory neurons","Inhibitory neurons","Dopaminergic neurons","Retina cells","T-cells"))
+```
+
+## The fully formatted results now need to be written out in a presentable way that can be a supplemental table.
+```{r write_out}
+# Arranging columns and adding a "yes" or "no" column that will indicate if the cell poulation passed significance.
+full.ldsc.results <- clean.ldsc_atac.types %>%
+  dplyr::select(cell.population=cell_ordered2,type,gwas,coefficient,coefficient_se,coefficient_p_value,p.log10) %>%
+  dplyr::mutate(signif.trait=if_else(p.log10 >= -log10(0.05/25),"yes","no")) %>%
+  dplyr::mutate(signif.all=if_else(p.log10 >= -log10(0.05/(25*19)),"yes","no"))
+
+# Renaming the GWAS traits names to be more clear.
+full.ldsc.results$gwas <- mapvalues(full.ldsc.results$gwas,from=c("Alz","AMD","BIP","BMI","EDU","ILAE_All_Epi","ILAE_Focal_Epi","ILAE_GGE_Epi","IQ","MDD","Neurot","new_PASS_Crohns_Disease","new_PASS_Multiple_sclerosis","new_PASS_Ulcerative_Colitis","new_UKBB_munged_disease_ASTHMA_DIAGNOSED"),to=c("Alzheimers disease","Age-related macular degeneration","Bipolar disorder","Body mass index","Education years","Epilepsy - all","Epilepsy - focal","Epilepsy - GGE","Intelligence (IQ)","Major depressive disorder","Neuroticism","Crohns disease","Multiple sclerosis","Ulcerative colitis","Asthma"))
+
+# Splitting the results by GWAS
+split.results <- split(full.ldsc.results,full.ldsc.results$gwas)
+
+# Writing out the results so that each tab in the resluting excel sheet is results from a different GWAS
+require(openxlsx)
+write.xlsx(split.results, file = file.path(github,"excel_ldsc.results.xlsx"))
+```
+
+```{r making some plots}
+library(ggpubr)
+library(ggsci)
+library(patchwork)
+library(pals)
+
+# I just wanted to note that these are the dead attempts at trying to find the right color palette
+#pal <- get_palette("Set1",6)
+#pal <- pal_igv()(25)
+#pal <- sample(cols25(),25)
+#pal <- as.character(as.data.frame(sample(glasbey(),25))[,1])
+#pal <- c("#E41A1C","#377EB8","#4DAF4A","#984EA3","#FF7F00","#F781BF")
+
+# Great little trick to use in order to get everything the desired color in ggplot
+col <- c(Glia="#4DAF4A",
+         `Excitatory neurons`="#377EB8",
+         `Inhibitory neurons`="#984EA3",
+         `Dopaminergic neurons`="#E41A1C",
+         `Retina cells`="#FF7F00",
+         `T-cells`="#F781BF")
+
+#Getting GWAS levels
+gwas.levels <- levels(clean.ldsc_atac.types$gwas)
+
+#Ordering the cell populations in a specific way
+clean.ldsc_atac.types$cell_ordered3 <- with(clean.ldsc_atac.types, factor(cell_ordered2, levels = rev(levels(cell_ordered2))))
+
+# Plotting results from one GWAS
+clozuk.sz <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="SZ_CLOZUK"),
+            aes(x=cell_ordered3,y=p.log10, color=type)) +
+  geom_point(size=4) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  geom_hline(yintercept=-log10(0.05/25), color="red", linetype="dashed", lwd=0.5, alpha=0.5) +
+  geom_hline(yintercept=-log10(0.05/(25*19)), color="blue", linetype="dashed", lwd=0.5, alpha = 0.5) +
+  ggtitle("CLOZUK SZ") + ylim(0,12) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=16,family="Helvetica", vjust = -1),
+        axis.text.x = element_text(size=10,colour = "black",family = "Helvetica",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.grid.major.y = element_line(color = "grey90",linetype = "dashed"),
+        plot.title = element_blank(),
+        legend.text = element_text(size = 10,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+clozuk.sz
+
+pdf(file = file.path(github,"Figure.1-clozuk.09202018.pdf"),width = 8,height = 4.5)
+clozuk.sz
+dev.off()
+```
+
+```{r making pgc ldsc-seg plot}
+pgc.sz <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="SZ_PGC"),
+            aes(x=cell_ordered3,y=p.log10, color=type)) +
+  geom_point(size=4) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  geom_hline(yintercept=-log10(0.05/25), color="red", linetype="dashed", lwd=0.5,alpha=0.5) +
+  geom_hline(yintercept=-log10(0.05/(25*19)), color="blue", linetype="dashed", lwd=0.5,alpha=0.5) +
+  ylim(0,12) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+   theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=16,family="Helvetica", vjust = -1),
+        axis.text.x = element_text(size=10,colour = "black",family = "Helvetica",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() + 
+  theme(panel.grid.major.y = element_line(color = "grey90",linetype = "dashed"),
+        legend.text = element_text(size = 10,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank()) +
+  ggtitle("PGC SZ GWAS")
+
+pgc.sz
+
+pdf(file = file.path(wd,"Figure.S2-pgc.09202018.pdf"),width = 8,height = 5)
+pgc.sz
+dev.off()
+```
+
+```{r}
+#Immune related
+p.other <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="new_PASS_Crohns_Disease" | gwas=="new_PASS_Ulcerative_Colitis" | gwas=="new_UKBB_munged_disease_ASTHMA_DIAGNOSED"), aes(x=cell_ordered3,y=p.log10, color=type)) +
+  geom_point(size=3) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  geom_hline(yintercept=-log10(0.05/25), color="red", linetype="dashed", lwd=0.5,alpha=0.5) +
+  geom_hline(yintercept=-log10(0.05/(25*19)), color="blue", linetype="dashed", lwd=0.5,alpha=0.5) +
+  ylim(0,12) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=20,family="Helvetica", vjust=-1),
+        axis.text.x = element_text(size=8,family = "Helvetica",color = "black",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.background = element_rect(fill = NA, color = "black", size=1),
+        panel.grid.major.y = element_line(color = "grey90",linetype = "dashed"),
+        legend.text = element_text(size = 8,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+disease_names <- c(
+                    `new_PASS_Crohns_Disease` = "Crohns disease",
+                    `new_PASS_Ulcerative_Colitis` = "Ulcerative colitis",
+                    `new_UKBB_munged_disease_ASTHMA_DIAGNOSED` = "Asthma"
+                    )
+
+immune.p <- p.other +
+  facet_wrap(~gwas, nrow = 1, labeller = as_labeller(disease_names)) +
+  theme(strip.text = element_text(size=10,family = "Helvetica",colour = "black", face = "bold", vjust = -0.75),
+        panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        strip.background = element_blank()) + ggtitle("Immune")
+immune.p
+
+pdf(file = file.path(wd,"Figure.S3A_immune.09202018.pdf"),width = 12,height = 4.5)
+immune.p
+dev.off()
+```
+
+```{r}
+#psych
+p.psy <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="ADHD" | gwas=="BIP" | gwas=="MDD"), aes(x=cell_ordered3,y=p.log10, color=type)) +
+  geom_point(size=3) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  geom_hline(yintercept=-log10(0.05/25), color="red", linetype="dashed", lwd=0.5,alpha=0.5) +
+  geom_hline(yintercept=-log10(0.05/(25*19)), color="blue", linetype="dashed", lwd=0.5,alpha=0.5) +
+  ylim(0,12) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=20,family="Helvetica", vjust=-1),
+        axis.text.x = element_text(size=8,family = "Helvetica",color = "black",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.background = element_rect(fill = NA, color = "black", size=1),
+        legend.text = element_text(size = 8,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+disease_names <- c(
+                    `ADHD` = "Attention deficit hyperactivity disorder",
+                    `BIP` = "Bipolar disorder",
+                    `MDD` = "Major depressive disorder"
+                    )
+
+psych.p <- p.psy + facet_wrap(~gwas, nrow = 1,labeller = as_labeller(disease_names)) +
+  theme(strip.text = element_text(size=10,family = "Helvetica",colour = "black",face = "bold",vjust = -0.75),
+        panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        strip.background = element_blank()) + ggtitle("Neuropsychiatric")
+psych.p
+
+pdf(file = file.path(wd,"Figure.2A-psych.09202018.pdf"),width = 12,height = 4.5)
+psych.p
+dev.off()
+```
+
+```{r}
+#neurological
+p.neuro <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="Alz" | gwas=="ILAE_All_Epi" | gwas=="ILAE_GGE_Epi" | gwas=="ILAE_Focal_Epi" | gwas=="new_PASS_Multiple_sclerosis"), aes(x=cell_ordered3,y=p.log10, color=type)) +
+  geom_point(size=3) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  geom_hline(yintercept=-log10(0.05/25), color="red", linetype="dashed", lwd=0.5,alpha=0.5) +
+  geom_hline(yintercept=-log10(0.05/(25*19)), color="blue", linetype="dashed", lwd=0.5,alpha=0.5) +
+  ylim(0,12) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=20,family="Helvetica", vjust=-1),
+        axis.text.x = element_text(size=8,family = "Helvetica",color = "black",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.background = element_rect(fill = NA, color = "black", size=1),
+        legend.text = element_text(size = 8,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+disease_names <- c(
+                    `Alz` = "Alzheimers disease",
+                    `ILAE_All_Epi` = "Epilepsy - all",
+                    `ILAE_GGE_Epi` = "Epilepsy - GGE",
+                    `ILAE_Focal_Epi` = "Epilepsy - focal",
+                    `new_PASS_Multiple_sclerosis` = "Multiple sclerosis"
+                    )
+
+neuro.p <- p.neuro + facet_wrap(~gwas, nrow = 1,labeller = as_labeller(disease_names)) +
+  theme(strip.text = element_text(size=10,family = "Helvetica",colour = "black",face = "bold", vjust = -0.75),
+        panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        strip.background = element_blank()) + ggtitle("Neurological")
+neuro.p
+
+pdf(file = file.path(wd,"Figure.2C-neuro_09202018.pdf"),width = 12,height = 4.5)
+neuro.p
+dev.off()
+```
+
+```{r}
+#behavioral
+p.behave <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="IQ" | gwas=="EDU" | gwas=="Neurot"), aes(x=cell_ordered3,y=p.log10, color=type)) +
+  geom_point(size=3) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  geom_hline(yintercept=-log10(0.05/25), color="red", linetype="dashed", lwd=0.5,alpha=0.5) +
+  geom_hline(yintercept=-log10(0.05/(25*19)), color="blue", linetype="dashed", lwd=0.5,alpha=0.5) +
+  ylim(0,12) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=20,family="Helvetica", vjust=-1),
+        axis.text.x = element_text(size=8,family = "Helvetica",color = "black",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.background = element_rect(fill = NA, color = "black", size=1),
+        legend.text = element_text(size = 8,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+disease_names <- c(
+                    `IQ` = "Intelligence (IQ)",
+                    `EDU` = "Education years",
+                    `Neurot` = "Neuroticism"
+                    )
+
+behave.p <- p.behave + facet_wrap(~gwas, nrow = 1,labeller = as_labeller(disease_names)) + 
+  theme(strip.text = element_text(size=10,family = "Helvetica",colour = "black",face = "bold", vjust = -0.75),
+        panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        strip.background = element_blank()) + ggtitle("Behavioral")
+behave.p
+
+pdf(file = file.path(wd,"Figure.2B-behavioral_09202018.pdf"),width = 12,height = 4.5)
+behave.p
+dev.off()
+```
+
+```{r}
+#additional
+p.add <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="Height" | gwas=="BMI" | gwas=="AMD"), aes(x=cell_ordered3,y=p.log10, color=type)) +
+  geom_point(size=3) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  geom_hline(yintercept=-log10(0.05/25), color="red", linetype="dashed", lwd=0.5,alpha=0.5) +
+  geom_hline(yintercept=-log10(0.05/(25*19)), color="blue", linetype="dashed", lwd=0.5,alpha=0.5) +
+  ylim(0,12) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=20,family="Helvetica", vjust=-1),
+        axis.text.x = element_text(size=8,family = "Helvetica",color = "black",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.background = element_rect(fill = NA, color = "black", size=1),
+        legend.text = element_text(size = 8,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+disease_names <- c(
+                    `Height` = "Height",
+                    `BMI` = "Body mass index",
+                    `AMD` = "Age-related macular degeneration "
+                    )
+
+add.p <- p.add + facet_wrap(~gwas, nrow = 1,labeller = as_labeller(disease_names)) +
+  theme(strip.text = element_text(size=10,family = "Helvetica",colour = "black",face = "bold",vjust = -0.75),
+        panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        strip.background = element_blank()) + ggtitle("Additional traits")
+add.p
+
+pdf(file = file.path(wd,"Figure.S3B-additional_09202018.pdf"),width = 12,height = 4.5)
+add.p
+dev.off()
+```
