@@ -6,6 +6,11 @@ https://www.biorxiv.org/content/early/2018/09/26/427484
 
 This repsitory will be continuously updated.
 
+## 10-10-2018
+- Uploaded code for running LDSC on ATAC-seq peaks
+- Uploaded BED file ("hg19_combined_peaks.tar.gz") containing all peaks used in LDSC analysis. This includes chromosome, start, end, and cell population where the peak came from.
+- Uploaded BED file ("mm10_merged_peaks.tar.gz") containing the mm10 merged peak set. This includes chromosome, start, end, and number of cell populations from which the merged became came from.
+
 ## 10-01-2018
 
 - Results and logs from LDSC cell type specific analyses ("ldsc_cts_results" and "ldsc_cts_logs", respectively) have been uploaded  
