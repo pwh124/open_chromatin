@@ -45,6 +45,7 @@ clean.ldsc_atac.types <- clean.ldsc_atac %>%
                                                       if_else(grepl("blue|green|rod",cell_ordered,ignore.case = T),"Retina cells",
                                                               if_else(grepl("cd4|cd8",cell_ordered,ignore.case = T),"T-cells","NA")))))))
 
+# Ordering the population types
 clean.ldsc_atac.types$type <- factor(clean.ldsc_atac.types$type, levels=c("Glia","Excitatory neurons","Inhibitory neurons","Dopaminergic neurons","Retina cells","T-cells"))
 ```
 
@@ -67,7 +68,9 @@ require(openxlsx)
 write.xlsx(split.results, file = file.path(github,"excel_ldsc.results.xlsx"))
 ```
 
+## Now I want to plot some results!
 ```{r making some plots}
+# Loading some libraries that may be needed
 library(ggpubr)
 library(ggsci)
 library(patchwork)
@@ -93,8 +96,10 @@ gwas.levels <- levels(clean.ldsc_atac.types$gwas)
 
 #Ordering the cell populations in a specific way
 clean.ldsc_atac.types$cell_ordered3 <- with(clean.ldsc_atac.types, factor(cell_ordered2, levels = rev(levels(cell_ordered2))))
+```
 
-# Plotting results from one GWAS
+## Plotting the results from LDSC-SEG run on the CLOZUK schizophrenia GWAS
+```{r plotting-clozuk}
 clozuk.sz <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="SZ_CLOZUK"),
             aes(x=cell_ordered3,y=p.log10, color=type)) +
   geom_point(size=4) +
@@ -119,11 +124,12 @@ clozuk.sz <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="SZ_CLOZUK"),
 
 clozuk.sz
 
-pdf(file = file.path(github,"Figure.1-clozuk.09202018.pdf"),width = 8,height = 4.5)
+pdf(file = file.path(github,"Figure.1-clozuk.pdf"),width = 8,height = 4.5)
 clozuk.sz
 dev.off()
 ```
 
+## Plotting LDSC-SEG results from PGC schizophrenia GWAS.
 ```{r making pgc ldsc-seg plot}
 pgc.sz <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="SZ_PGC"),
             aes(x=cell_ordered3,y=p.log10, color=type)) +
@@ -149,11 +155,12 @@ pgc.sz <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="SZ_PGC"),
 
 pgc.sz
 
-pdf(file = file.path(wd,"Figure.S2-pgc.09202018.pdf"),width = 8,height = 5)
+pdf(file = file.path(github,"Figure.S2-pgc.pdf"),width = 8,height = 5)
 pgc.sz
 dev.off()
 ```
 
+## Plotting all the LDSC-SEG results from immune GWAS 
 ```{r}
 #Immune related
 p.other <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="new_PASS_Crohns_Disease" | gwas=="new_PASS_Ulcerative_Colitis" | gwas=="new_UKBB_munged_disease_ASTHMA_DIAGNOSED"), aes(x=cell_ordered3,y=p.log10, color=type)) +
@@ -190,13 +197,13 @@ immune.p <- p.other +
         strip.background = element_blank()) + ggtitle("Immune")
 immune.p
 
-pdf(file = file.path(wd,"Figure.S3A_immune.09202018.pdf"),width = 12,height = 4.5)
+pdf(file = file.path(github,"Figure.S3A_immune.pdf"),width = 12,height = 4.5)
 immune.p
 dev.off()
 ```
 
+## Plotting all the LDSC-SEG results from neuropsychiatric GWAS
 ```{r}
-#psych
 p.psy <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="ADHD" | gwas=="BIP" | gwas=="MDD"), aes(x=cell_ordered3,y=p.log10, color=type)) +
   geom_point(size=3) +
   theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
@@ -229,11 +236,12 @@ psych.p <- p.psy + facet_wrap(~gwas, nrow = 1,labeller = as_labeller(disease_nam
         strip.background = element_blank()) + ggtitle("Neuropsychiatric")
 psych.p
 
-pdf(file = file.path(wd,"Figure.2A-psych.09202018.pdf"),width = 12,height = 4.5)
+pdf(file = file.path(github,"Figure.2A-psych.pdf"),width = 12,height = 4.5)
 psych.p
 dev.off()
 ```
 
+## Plotting all the LDSC-SEG results from neurological GWAS
 ```{r}
 #neurological
 p.neuro <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="Alz" | gwas=="ILAE_All_Epi" | gwas=="ILAE_GGE_Epi" | gwas=="ILAE_Focal_Epi" | gwas=="new_PASS_Multiple_sclerosis"), aes(x=cell_ordered3,y=p.log10, color=type)) +
@@ -270,11 +278,12 @@ neuro.p <- p.neuro + facet_wrap(~gwas, nrow = 1,labeller = as_labeller(disease_n
         strip.background = element_blank()) + ggtitle("Neurological")
 neuro.p
 
-pdf(file = file.path(wd,"Figure.2C-neuro_09202018.pdf"),width = 12,height = 4.5)
+pdf(file = file.path(github,"Figure.2C-neuro.pdf"),width = 12,height = 4.5)
 neuro.p
 dev.off()
 ```
 
+## Plotting all the LDSC-SEG results from behavorial GWAS
 ```{r}
 #behavioral
 p.behave <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="IQ" | gwas=="EDU" | gwas=="Neurot"), aes(x=cell_ordered3,y=p.log10, color=type)) +
@@ -309,11 +318,12 @@ behave.p <- p.behave + facet_wrap(~gwas, nrow = 1,labeller = as_labeller(disease
         strip.background = element_blank()) + ggtitle("Behavioral")
 behave.p
 
-pdf(file = file.path(wd,"Figure.2B-behavioral_09202018.pdf"),width = 12,height = 4.5)
+pdf(file = file.path(github,"Figure.2B-behavioral.pdf"),width = 12,height = 4.5)
 behave.p
 dev.off()
 ```
 
+## Plotting all the LDSC-SEG results from additonally analyzed GWAS
 ```{r}
 #additional
 p.add <- ggplot(clean.ldsc_atac.types %>% dplyr::filter(gwas=="Height" | gwas=="BMI" | gwas=="AMD"), aes(x=cell_ordered3,y=p.log10, color=type)) +
@@ -348,7 +358,7 @@ add.p <- p.add + facet_wrap(~gwas, nrow = 1,labeller = as_labeller(disease_names
         strip.background = element_blank()) + ggtitle("Additional traits")
 add.p
 
-pdf(file = file.path(wd,"Figure.S3B-additional_09202018.pdf"),width = 12,height = 4.5)
+pdf(file = file.path(github,"Figure.S3B-additional.pdf"),width = 12,height = 4.5)
 add.p
 dev.off()
 ```
