@@ -6,6 +6,9 @@ https://www.biorxiv.org/content/early/2018/09/26/427484
 
 This repsitory will be continuously updated.
 
+## 10-15-2018
+- Added output from "ldsc_R_code.Rmd" including figures 1, 2, S2, and S3
+
 ## 10-10-2018
 - Uploaded code for running LDSC on ATAC-seq peaks ("running-ldsc.md")
 - Uploaded BED file ("hg19_combined_peaks.tar.gz") containing all peaks used in LDSC analysis. This includes chromosome, start, end, and cell population where the peak came from.
