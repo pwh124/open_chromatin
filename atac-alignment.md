@@ -1,4 +1,4 @@
-#Alignment
+# Alignment
 ## Introduction
 
 This is my attempt to start documenting the command line code I am using to process publicly available mouse ATAC-seq data.
@@ -8,16 +8,16 @@ I will hopefully be breaking this into scripts to then load on to GitHub for rep
 Almost all of these commands were performed on the MARCC server cluster through JHU.
 
 ## Dependencies
-###Command line 
+### Command line 
 [samtools v1.3.1](https://github.com/samtools/samtools/releases/tag/1.3.1), [samtools v0.1.19](https://github.com/samtools/samtools/releases/tag/0.1.19), [bowtie2 v2.2.5](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml)
 
-###Python 
+### Python 
 None
 
-###R  
+### R  
 None
 
-##Rough directory structure
+## Rough directory structure
 ``` 
 GSE{someNumber}_data    
 |-- download  
@@ -30,7 +30,7 @@ GSE{someNumber}_data
 |		final_align 
 ```
 ## Code
-###Aligning
+### Aligning 
 *Setting up variables*  
 
 ```bash
@@ -129,9 +129,9 @@ samtools flagstat pp_rmdup_sorted_${NAME}_mm10.bam > flagstats/final_${NAME}_fla
 samtools index pp_rmdup_sorted_${NAME}_mm10.bam
 ```
 
-###Removing reads with mapq <= 30
+### Removing reads with mapq <= 30
 ```bash
-mkdir final_alignq
+mkdir final_align
 
 module load samtools
 
@@ -148,7 +148,7 @@ done
 
 ```
 
-###Merging replicates
+### Merging replicates
 ```bash
 FILE1=$1
 FILE2=$2
@@ -165,7 +165,7 @@ samtools sort -@ 15 -o sorted_${NAME}.bam ${NAME}.bam
 samtools index sorted_${NAME}.bam
 ```
 
-###Calling peaks
+### Calling peaks
 ```shell
 TMPDIR=$HOME/tmp
 
@@ -182,7 +182,7 @@ done
 exit 0
 ```
 
-###Making count matrix
+### Making count matrix
 ```shell
 cat *narrowPeak > atac_all_cells.narrowPeak
 sort -k1,1 -k2,2n atac_all_cells.narrowPeak > sorted_atac_all_cells.bed
@@ -223,20 +223,30 @@ bedtools nuc -fi ../../fasta/ucsc_goldenpath_mm10.fa -bed all_atac_GC_peaks.txt 
 
 ```
 
-###Moving in to R
+### Moving in to R
 
-###liftover
+### liftOver 
+*Convert to a BED file that can be easily lifted over*
 ```shell
-#convert to bed that can be lifted over
 awk -v OFS='\t' '{print $1,$2,$3,$4}' shift_ext_sorted_cd8_mm10_merged_GSE107076_peaks.narrowPeak > ../../liftover/mm10_beds/shift_ext_sorted_cd8_mm10_merged_GSE107076_peaks.bed
-
-#lifting over
+```
+*liftOver from mm10 to hg19*
+```shell
 $HOME/privatemodules/liftOver.1 -minMatch=0.1 ${i} $OUTDIR1/mm10ToHg19.over.chain.gz $OUTDIR3/${i%.bed}_hg19_10.bed $OUTDIR3/${i%.bed}_hg19_unlifted_10.bed
 
 #beds then cleaned (remove blacklist) and to ldsc directory
+```
 
 #making annot files for ldsc
-for chr in {1..22}; do python ~/my-python-modules/ldsc/make_annot.py --bed-file cd8_merged_GSE107076_hg19.bed --bimfile ../../1000G_EUR_Phase3_plink/1000G.EUR.QC.${chr}.bim --annot-file cd8_merged_GSE107076_hg19.${chr}.annot.gz; done
+```shell
+for chr in {1..22}
+do 
+python ~/my-python-modules/ldsc/make_annot.py \
+--bed-file cd8_merged_GSE107076_hg19.bed \
+--bimfile ../../1000G_EUR_Phase3_plink/1000G.EUR.QC.${chr}.bim \
+--annot-file cd8_merged_GSE107076_hg19.${chr}.annot.gz
+done
+```
 
 
 
