@@ -18,7 +18,7 @@ echo $BT2_path # path to bowtie2 v2.2.5
 echo $rmdup_path # path to samtools 0.1.19 which contains rmdup that actually works
 echo $samtools_path # path to samtools 1.3.1 for all other samtools functions
 
-## The directories for the alignment will need to be set up for each different project from which sequencing will be aligned. This will require that this script is copied and modified for the specific sequencing. See the description of the file directory set up in 'Alignment.md." $MAIN_DIR should remain invariant. $PROJECT_DIR should change with each publicly available dataset analyzed.
+## The directories for the alignment will need to be set up for each different project from which sequencing will be aligned. This will require that this script is copied and modified for the specific sequencing. See the description of the file directory set up in 'Alignment.md." $MAIN_DIR should remain invariant. $PROJECT_NAME (which is the name of the project directory) should change with each publicly available dataset analyzed.
 
 MAIN_DIR='ENTER MAIN DIRECTORY HERE'
 INDEX_DIR='ENTER DIRECTORY CONTAINING BOWTIE2 INDICES HERE'
