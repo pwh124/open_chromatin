@@ -1,0 +1,27 @@
+cell.population	file.name	type
+Embryonic DA forebrain	fb_da_mccallion_hg19.1.annot	Dopaminergic
+Excitatory Layer IV	scnn1a.4_excite_GSE87548_hg19.1.annot	Excitatory
+Excitatory Layers II/III	cux2_excite_GSE87548_hg19.1.annot	Excitatory
+Inhibitory*	inhib1_preissl_hg19.1.annot	Inhibitory
+Inhibitory MSN*	inhib2_preissl_hg19.1.annot	Inhibitory
+Neun negative	neun.neg_preissl_hg19.1.annot	Glia
+Embryonic DA midbrain	mb_da_mccallion_hg19.1.annot	Dopaminergic
+Excitatory Layer VI*	ex1_preissl_hg19.1.annot	Excitatory
+Inhibitory VIP	cort_vip.gaba_GSE63137_hg19.1.annot	Inhibitory
+Excitatory Layer V	rbp4.5_excite_GSE87548_hg19.1.annot	Excitatory
+Inhibitory Gad2	gad2_inhib_GSE87548_hg19.1.annot	Inhibitory
+Oligodendrocyte*	oligo_preissl_hg19.1.annot	Glia
+Excitatory Layers II-V*	ex3_preissl_hg19.1.annot	Excitatory
+Excitatory Layer VI	ntsr1.6_excite_GSE87548_hg19.1.annot	Excitatory
+Excitatory DG*	ex2_preissl_hg19.1.annot	Excitatory
+CD4 T-cells	cd4_merged_GSE107076_hg19.1.annot	T-cells
+Microglia*	microglia_preissl_hg19.1.annot	Glia
+Astrocytes*	astrocytes_merge_preissl_hg19.1.annot	Glia
+Excitatory Camk2a	cort_excite_GSE63137_hg19.1.annot	Excitatory
+Rods	rod_GSE83312_hg19.1.annot	Retina
+Cones (blue)	blue.cone_ss.all_merge_GSE83312_hg19.1.annot	Retina
+CD8 T-cells	cd8_merged_GSE107076_hg19.1.annot	T-cells
+Inhibitory PV	cort_pv.gaba_GSE63137_hg19.1.annot	Inhibitory
+Microglia	adult_microglia_merged_GSE79816_hg19.1.annot	Glia
+Cones (green)	green.cone_GSE83312_hg19.1.annot	Retina
+sum	sum	sum

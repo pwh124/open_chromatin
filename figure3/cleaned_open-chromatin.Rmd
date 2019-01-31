@@ -1,0 +1,434 @@
+---
+title: "Open chromatin matrix"
+author: "Paul Hook"
+date: "2019-01-31"
+output: html_document
+---
+
+# I want to be able to load and write all the data in the same directory as the Rmd script so that someone could just download the directory and everything would run out of the box. The "here" package will help with that
+
+```{r, loading-packages}
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+library(reshape2)
+library(ggsci)
+```
+
+#SNP overlap file was created from LDSC annotation matrices as described in the manuscript. Loading that annotation matrix that includes "baseline" and my own annotation. I remove the "baseline" annotation and some unnecessary columns
+```{r, reading-in-data}
+# loading
+snps.path <- here::here("final_overlap_snps_combined.annot.txt")
+
+# cleaning
+mat <- read.delim2(snps.path, sep = ',') %>%
+  dplyr::select(-ends_with(".bed"),-base,-CM)
+```
+
+#I then wanted to create a histogram showing the distribution of how many annotations overlap each snp
+```{r}
+# Making histogram of overlap counts for supplemental figure
+mat.hist <- ggplot(data=mat, aes(mat$sum)) + # use the "sum" column which has num I want
+  geom_histogram(bins = 25,
+                 binwidth = 1,
+                 fill="seagreen", col="black", alpha=0.6) + # seagreen is a fun color
+  theme_pubr() + ylim(0,250000) +
+  xlab("Number of cell populations") +
+  ylab("Number of SNPs") +
+  ggtitle("Number of cell populations\ncapturing each SNP in open chromatin") +
+  theme(plot.title = element_text(hjust = 0.5,family="Helvetica",size = 12,color = "black"),
+        axis.title = element_text(family = "Helvetica",size = 10,color = "black"),
+        axis.text = element_text(family = "Helvetica",size = 8,color = "black"),
+        plot.background = element_blank())
+
+mat.hist
+
+# Count how many snps i have
+num.snps <- nrow(mat)
+# Create a table just to see how many snps fall in overlap bins
+overlap.sum <- table(mat$sum) 
+# ~45% of SNPs used in LDSC overlap with open chromatin in a single-cell type
+#Interestingly, a large portion of SNPs that overlap any open chromatin region only hit open chromatin in 1 (and only 1) of the cell types analyzed.
+
+# save the figure to same directory as .Rmd
+pdf(file = here::here("new-Figure.S4A_overlap-hist.pdf"),height = 4, width = 4)
+mat.hist
+dev.off()
+```
+
+# Next I wanted to just look at the SNPs that fall in to CLOZUK SZ loci. These were obtained using rAggr as described in the manscript.
+```{r, clozuk-snps}
+# Reading in SNPs in SZ loci
+sz <- read.delim(here::here("raggr_SZ-CLOZUK-0.05_union.txt"), sep=",")
+
+# Counting the # of loci retained
+nrow(unique(sz["SNP1.Name"])) 
+#144 loci - this excludes a locus that has too low MAF to be obtained. That will be corrected below
+
+# Splitting SNP1 (lead) and SNP2 (ld friend) columns in order for them to be more readable
+sz$index.snp <- sapply(str_split(sz$SNP1.Name, pattern = ":"), '[', 1)
+sz$ld.snp <- sapply(str_split(sz$SNP2.Name, pattern = ":"), '[', 1)
+
+# filtering out anything without an official rs #
+# MAF too low for rAggr with rs254782, so I need to add back in. Data obtained from Ensembl
+# Removing MHC locus since it wasn't included in LDSC analysis
+sz.snps <- sz %>% dplyr::select(index.snp,ld.snp,SNP2.Chr,SNP2.Pos,SNP2.MAF) %>%
+  dplyr::filter(str_detect(ld.snp, "rs")) %>%
+  rbind(c("rs254782","rs254782",5,88000630,0.036)) %>% # adding in rs254782
+  dplyr::filter(index.snp != "rs3130820") # removing MHC SNP
+
+nrow(unique(sz.snps["index.snp"])) 
+#144 loci which is what I want
+
+# Creating a cleaned up SNP table so that we have something that looks similar to a bed file
+sz.table <- sz.snps %>% as_tibble() %>%
+  dplyr::select(SNP2.Chr,SNP2.Pos,ld.snp) %>%
+  dplyr::mutate(end = as.numeric(SNP2.Pos) + 1,
+                chr = paste0("chr",SNP2.Chr)) %>%
+  dplyr::select(chr,SNP2.Pos,end,ld.snp)
+
+# Writing out that table
+write.table(sz.table,file = here::here("new-sz-snp.bed"),col.names = F,sep = "\t",quote = F,row.names = F)
+
+# Merging SZ SNPs with ATAC annotation matrix
+sz.test <- merge(x=sz.snps, y=mat, by.x ='ld.snp', by.y='SNP', all.x = T) %>%
+  dplyr::select(-CHR,-BP)
+
+# Setting all NAs to 0 for no overlap
+sz.test[is.na(sz.test)] <- 0
+
+nrow(unique(sz.test["index.snp"])) #144 loci still!
+```
+
+# The issue with the data at this point is that the cell names are the names of the files they came from. This will be remedied with a meta-data dataframe I created. I did it in this manner becasue the melted dataframe will be helpful later.
+```{r, renaming-columns}
+# Melt the data
+melt.df <- sz.test %>%
+  melt(id.vars = c("index.snp","ld.snp","SNP2.Chr","SNP2.Pos","SNP2.MAF")) %>%
+  rename(file.name=variable)
+
+# Load meta dataframe
+overlap.meta <- read.delim2(here::here("overlap-meta.txt"))
+
+# Merge the data
+name.melt.df <- merge(x=melt.df,y=overlap.meta,by="file.name") # this will be important for the loci images later
+
+# Dcast the data so that the data is back in it's first form
+sz.test <- dcast(name.melt.df, index.snp + ld.snp + SNP2.Chr + SNP2.Pos + SNP2.MAF ~ cell.population)
+```
+
+# I wanted to write out the open matrix with new names and a summary of how many snps are in each locus and overlapped at each locus
+```{r, writing-summaries}
+#Write out sz.test as Table S11
+write.table(sz.test,file = here::here("new-Table.S11_SZ-open-matrix.txt"),quote = F,row.names = F,col.names = T,sep = "\t")
+
+# Summarizing overlaps at each locus
+sz.sum.df <- sz.test %>%
+  dplyr::group_by(index.snp) %>%
+  dplyr::summarise(ld.snps=n(),
+                   snp.overlap=sum(sum>0))
+
+# Writing it out
+write.table(sz.sum.df,file = here::here("new-Table.S9_SNP-overlap.txt"),quote = F,sep = '\t',row.names = F)
+```
+
+# In order to display the data in a concise way, I wanted to make a plot that would just display if >= 1 SNP was overlapped by a certain annotaion or not (binary). I had to first count overlaps for each annotation in each locus, then process the data.
+```{r, data-process-1}
+# Counting number of SNPs overlaping each annotation in each locus
+sz.loci.df <- sz.test %>%
+  dplyr::select(-ld.snp,-SNP2.MAF,-SNP2.Chr,-SNP2.Pos,-sum) %>%
+  dplyr::group_by(index.snp) %>%
+  dplyr::summarise_all(funs(sum))
+
+# Melting this data to see it by locus
+m2 <- melt(sz.loci.df,id.vars = "index.snp")
+names(m2) <- c("index.snp","cell.pop","snps")
+
+# Creating a metadata sheet that will help add in information lost
+sz.meta <- sz %>%
+  dplyr::select(index.snp,SNP1.Chr,SNP1.Pos) %>%
+  rbind(c("rs254782",5,88000630)) %>%  # need to add this snp in again
+  dplyr::filter(index.snp != "rs3130820") %>% # need to remove MHC snp again
+  unique()
+names(sz.meta) <- c("index.snp","index.chr","index.pos")
+
+# Now merging the meta data with the melted data
+m3 <- merge(x=m2,y=sz.meta,by.x = "index.snp", by.y="index.snp")
+nrow(unique(m3["index.snp"])) #144 loci still
+
+# Creating a variable that had all the cell names in the order I eventually want them
+cell.order <- c("Microglia","Microglia*","Astrocytes*","Oligodendrocyte*","Neun negative","Excitatory Camk2a","Excitatory Layers II/III","Excitatory Layer IV","Excitatory Layer V","Excitatory Layers II-V*","Excitatory Layer VI","Excitatory Layer VI*","Excitatory DG*","Inhibitory Gad2","Inhibitory*","Inhibitory PV","Inhibitory VIP","Inhibitory MSN*","Embryonic DA forebrain","Embryonic DA midbrain","Cones (blue)","Cones (green)","Rods","CD4 T-cells","CD8 T-cells")
+
+# Ordering the cell popultions by this cell order
+m3$cell.pop <- factor(m3$cell.pop,levels = cell.order)
+
+```
+
+# Now I wanted to color loci that had a snp overlapping part of the open chromatin annotation in each cell type. I wanted this to look like a heatmap. The trick is trying to get each group of cell populations ("Excitatory","Glia", etc) to be different colors. Additionally, I only want to keep loci that have at least 1 overlap.
+```{r rearranging-data}
+# Adding a snpFactor to say whether the SNP is in open or close chromatin
+m3$snpFactor <- cut(m3$snps,breaks = c(-1,0,max(m3$snps)),labels=c("closed","open"))
+
+# Merging with the meta data so that the type of cell could be added
+m4 <- merge(x=m3,y=overlap.meta,by.x="cell.pop",by.y="cell.population") %>%
+  dplyr::select(-file.name)
+
+# Merging the data with the the locus summary df and only keeping loci with at least one overlap. Loci were order in descending order of # of snps with an overlap
+m5 <- merge(x=m4,y=sz.sum.df,by="index.snp") %>%
+  dplyr::filter(snp.overlap > 0) %>%
+  dplyr::arrange(desc(snp.overlap)) %>%
+  dplyr::mutate(index.snp.order = factor(index.snp,unique(index.snp))) %>%
+  {.}
+
+```
+
+# After some trial and error, I found some ggplot themes I liked for my plots.
+```{r saving-themes}
+figure3a.theme <- 
+  theme(axis.text=element_text(face="bold",family = "Helvetica",color = "black"), #bold font for both axis text
+        axis.ticks=element_blank(), #set thickness of axis ticks
+        plot.background=element_blank(), #remove plot background
+        panel.border=element_blank(), #remove plot border
+        axis.text.x.top = element_text(angle = -45,vjust=0.3,hjust=1,colour = "black",size = 5,family = "Helvetica"),
+        axis.title = element_text(size = 12,family = "Helvetica",color = "black"),
+        legend.position = "bottom",
+        legend.title = element_text(size = 10,family = "Helvetica",colour = "black"),
+        legend.text = element_text(size = 6,family = "Helvetica",color = "black",face = "bold"),
+        axis.text.y = element_text(size=6),
+        axis.title.y = element_text(vjust=2),
+        legend.spacing.x = unit(0.2,'mm'),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.background = element_blank(),
+        legend.key.width = grid::unit(1.7,"cm"),
+        legend.key.height = grid::unit(0.4,"cm"),
+        legend.text.align = 0.5,
+        legend.justification = "center")
+
+
+locus.theme <- theme(axis.text=element_text(face="bold",family = "Helvetica",color = "black"), #bold font for both axis text
+        axis.ticks=element_blank(), #set thickness of axis ticks
+        plot.background=element_blank(), #remove plot background
+        panel.border=element_blank(), #remove plot border
+        axis.text.x.top = element_text(angle = -45,vjust=0.3,hjust=1,colour = "black",size = 5,family = "Helvetica"),
+        axis.title = element_text(size = 12,family = "Helvetica",color = "black"),
+        legend.position = "bottom",
+        legend.title = element_text(size = 10,family = "Helvetica",colour = "black"),
+        legend.text = element_text(size = 6,family = "Helvetica",color = "black",face = "bold"),
+        axis.text.y = element_text(size=6),
+        axis.title.y = element_text(vjust=2),
+        legend.spacing.x = unit(0.2,'mm'),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.background = element_blank(),
+        legend.key.width = grid::unit(1.7,"cm"),
+        legend.key.height = grid::unit(0.4,"cm"),
+        legend.text.align = 0.5,
+        legend.justification = "center",
+        plot.title = element_text(size = 12,family = "Helvetica",color="black",hjust = 0.5,vjust = -3,face = "bold"))
+
+```
+
+# Now I need to add a factor in so that each cell population would be a different color. This required having 6 levels: open in each cell type (5) and closed (1)
+```{r, testing_coloring}
+m6 <- m5 %>%
+  dplyr::mutate(color = if_else(type=="Glia" & snpFactor=="open","Glia",
+                               if_else(type=="Excitatory" & snpFactor=="open","Excitatory",
+                                       if_else(type=="Inhibitory" & snpFactor=="open","Inhibitory",
+                                               
+                                               if_else(type=="Dopaminergic" & snpFactor=="open","Dopaminergic",
+                                                       if_else(type=="Retina" & snpFactor=="open","Retina",
+                                                               if_else(type=="T-cells" & snpFactor=="open","T-cells","Closed")))))))
+
+m6$color <- factor(m6$color, levels = c("Closed","Dopaminergic","Glia","Retina","Excitatory","T-cells","Inhibitory"))
+```
+
+# Now I can plot 3A
+```{r, plot-3a}
+c <- ggplot(m6,aes(y=index.snp.order,x=cell.pop,fill=color))+
+  geom_tile(color="white",size=0.25)+
+  coord_fixed(ratio = 0.9)+
+  theme_grey(base_size=6)+
+  scale_x_discrete(position = "top",expand = c(0,0))+
+  scale_y_discrete(position = "left",expand=c(0,0))+
+  scale_fill_manual(values = c(Glia="#4DAF4A", #Clever trick here to get the colors you want
+                               Excitatory="#377EB8",
+                               Inhibitory="#984EA3",
+                               Dopaminergic="#E41A1C",
+                               Retina="#FF7F00",
+                               `T-cells`="#F781BF",
+                               Closed="grey90")) +
+  ylab("CLOZUK Schizophrenia GWAS loci with open chromatin overlap") +
+  xlab("Cell population") +
+  guides(fill=guide_legend(title = "Chromatin status",
+                           title.hjust = 0.5,
+                           label.position = "bottom",
+                           title.position = "top",
+                           label.vjust=4.2,
+                           ncol = 4,
+                           title.vjust = 2)) +
+  geom_vline(xintercept =5.5,size=0.4) +
+  geom_vline(xintercept =13.5,size=0.4) +
+  geom_vline(xintercept =18.5,size=0.4) +
+  geom_vline(xintercept =20.5,size=0.4) +
+  geom_vline(xintercept = 23.5, size=0.4) +
+  figure3a.theme
+
+c
+
+pdf(here::here("new-Figure.3A.pdf"),height = 11,width = 8)
+c
+dev.off()
+```
+
+# With 3A out of the way, I wanted to make the loci plots. This is where the original melted df goes a long way.
+```{r further-setting-name.melt}
+# Setting whether the chromatin is open or closed
+name.melt.df$snpFactor <- cut(name.melt.df$value,
+breaks = c(-1,0,1),
+labels=c("closed","open"))
+
+# Coloring by openess in each cell type
+color.name.melt.df <- name.melt.df %>%
+  dplyr::mutate(color = if_else(type=="Glia" & snpFactor=="open","Glia",
+                               if_else(type=="Excitatory" & snpFactor=="open","Excitatory",
+                                       if_else(type=="Inhibitory" & snpFactor=="open","Inhibitory",
+                                               if_else(type=="Dopaminergic" & snpFactor=="open","Dopaminergic",
+                                                       if_else(type=="Retina" & snpFactor=="open","Retina",
+                                                               if_else(type=="T-cells" & snpFactor=="open","T-cells","Closed")))))))
+
+color.name.melt.df$color <- factor(color.name.melt.df$color, levels = c("Closed","Dopaminergic","Glia","Retina","Excitatory","T-cells","Inhibitory"))
+
+# Making sure the cells would be in the correct order
+color.name.melt.df$cell.pop <- factor(color.name.melt.df$cell.pop, cell.order)
+```
+
+# Now I can make the locus subsets!
+```{r making locus subsets}
+pde4b.locus <- color.name.melt.df %>%
+  dplyr::select(-SNP2.MAF,-file.name) %>%
+  dplyr::filter(index.snp=="rs12129719",type != "sum") %>% # selecting the lead SNP and getting rid of sum column
+  dplyr::arrange(-desc(SNP2.Pos)) %>% # arranging by genomic location
+  dplyr::mutate(snp.order = factor(ld.snp, unique(ld.snp))) # setting snp order
+
+pde4b.p <- ggplot(pde4b.locus,aes(y=snp.order,x=cell.pop,fill=color))+
+  geom_tile(color="white",size=0.25)+
+  coord_fixed(ratio = 0.9)+
+  theme_grey(base_size=6)+
+  scale_x_discrete(position = "top",expand = c(0,0))+
+  scale_y_discrete(position = "left",expand=c(0,0))+
+  scale_fill_manual(values = c(Glia="#4DAF4A",
+                               Excitatory="#377EB8",
+                               Inhibitory="#984EA3",
+                               Dopaminergic="#E41A1C",
+                               Retina="#FF7F00",
+                               `T-cells`="#F781BF",
+                               Closed="grey90")) +
+  xlab("") +
+  ylab("rs12129719 locus\nCommon SNPs in LD") +
+  guides(fill=guide_legend(title = "Chromatin status",
+                           title.hjust = 0.5,
+                           label.position = "bottom",
+                           title.position = "top",
+                           label.vjust=4.2,
+                           ncol = 4,
+                           title.vjust = 2)) +
+  geom_vline(xintercept =5.5,size=0.25) +
+  geom_vline(xintercept =13.5,size=0.25) +
+  geom_vline(xintercept =18.5,size=0.25) +
+  geom_vline(xintercept =20.5,size=0.25) +
+  geom_vline(xintercept =23.5,size=0.25) +
+  ggtitle("Pde4b locus") + locus.theme
+  
+pde4b.p
+
+pdf(here::here("new-Figure.3C-pde4b.locus.pdf"),height = 4,width = 5)
+pde4b.p
+dev.off()
+```
+
+```{r cacna1c}
+# Same as above
+cacna1c.locus <- color.name.melt.df %>%
+  dplyr::select(-SNP2.MAF,-file.name) %>%
+  dplyr::filter(index.snp=="rs2007044",type != "sum") %>%
+  dplyr::arrange(-desc(SNP2.Pos)) %>%
+  dplyr::mutate(snp.order = factor(ld.snp, unique(ld.snp)))
+
+cacna1c.p <- ggplot(cacna1c.locus,aes(y=snp.order,x=cell.pop,fill=color))+
+  geom_tile(color="white",size=0.25)+
+  coord_fixed(ratio = 0.9)+
+  theme_grey(base_size=6)+
+  scale_x_discrete(position = "top",expand = c(0,0))+
+  scale_y_discrete(position = "left",expand=c(0,0))+
+  scale_fill_manual(values = c(Glia="#4DAF4A",
+                               Excitatory="#377EB8",
+                               Inhibitory="#984EA3",
+                               Dopaminergic="#E41A1C",
+                               Retina="#FF7F00",
+                               `T-cells`="#F781BF",
+                               Closed="grey90")) +
+  xlab("") +
+  ylab("rs2007044 locus\nCommon SNPs in LD") +
+  guides(fill=guide_legend(title = "Chromatin status",
+                           title.hjust = 0.5,
+                           label.position = "bottom",
+                           title.position = "top",
+                           label.vjust=4.2,
+                           ncol = 4,
+                           title.vjust = 2)) +
+  geom_vline(xintercept =5.5,size=0.25) +
+  geom_vline(xintercept =13.5,size=0.25) +
+  geom_vline(xintercept =18.5,size=0.25) +
+  geom_vline(xintercept =20.5,size=0.25) +
+  geom_vline(xintercept =23.5,size=0.25) +
+  ggtitle("Cacna1c locus") + locus.theme
+  
+cacna1c.p
+
+pdf(here::here("new-Figure.3D-cacna1c.locus.pdf"),height = 4,width = 5)
+cacna1c.p
+dev.off()
+```
+
+
+```{r foxg1.locus.1}
+# Same as above
+foxg1.locus <- color.name.melt.df %>%
+  dplyr::select(-SNP2.MAF,-file.name) %>%
+  dplyr::filter(index.snp=="rs1191551",type != "sum") %>%
+  dplyr::arrange(-desc(SNP2.Pos)) %>%
+  dplyr::mutate(snp.order = factor(ld.snp, unique(ld.snp)))
+
+foxg1.p <- ggplot(foxg1.locus,aes(y=snp.order,x=cell.pop,fill=color))+
+  geom_tile(color="white",size=0.25)+
+  coord_fixed(ratio = 0.9)+
+  theme_grey(base_size=6)+
+  scale_x_discrete(position = "top",expand = c(0,0))+
+  scale_y_discrete(position = "left",expand=c(0,0))+
+  scale_fill_manual(values = c(Glia="#4DAF4A",
+                               Excitatory="#377EB8",
+                               Inhibitory="#984EA3",
+                               Dopaminergic="#E41A1C",
+                               Retina="#FF7F00",
+                               `T-cells`="#F781BF",
+                               Closed="grey90")) +
+  xlab("") +
+  ylab("rs1191551 locus\nCommon SNPs in LD") +
+  guides(fill=guide_legend(title = "Chromatin status",
+                           title.hjust = 0.5,
+                           label.position = "bottom",
+                           title.position = "top",
+                           label.vjust=4.2,
+                           ncol = 4,
+                           title.vjust = 2)) +
+  geom_vline(xintercept =5.5,size=0.25) +
+  geom_vline(xintercept =13.5,size=0.25) +
+  geom_vline(xintercept =18.5,size=0.25) +
+  geom_vline(xintercept =20.5,size=0.25) +
+  geom_vline(xintercept =23.5,size=0.25) +
+  ggtitle("Foxg1 locus") + locus.theme
+
+pdf(here::here("new-Figure.3B-foxg1.locus.pdf"),height = 4,width = 5)
+foxg1.p
+dev.off()
+```
