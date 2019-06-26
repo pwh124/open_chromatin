@@ -1,0 +1,34 @@
+## CLOZUK SZ munging
+
+## Downloading CLOZUK files including summary stats, a list of well-imputed SNPs, and the md5 check sums for all files
+wget http://walters.psycm.cf.ac.uk/clozuk_pgc2.meta.sumstats.txt.gz
+wget http://walters.psycm.cf.ac.uk/clozuk_pgc2.meta.sumstats.info9.snplist.txt.gz
+wget http://walters.psycm.cf.ac.uk/clozuk_pgc2.meta.sumstats.txt.gz.md5
+wget http://walters.psycm.cf.ac.uk/clozuk_pgc2.meta.sumstats.info9.snplist.txt.gz.md5
+
+## One of the checksums had a carriage return in it so that was modified and the md5sums were checked
+cat clozuk_pgc2.meta.sumstats.info9.snplist.txt.gz.md5 clozuk_pgc2.meta.sumstats.txt.gz.md5 | sed 's/\r$//'  > clozuk-md5sum
+md5sum --check clozuk-md5sum > md5.check
+
+## Loaded modules needed for running sumstats munging
+module load python/2.7-anaconda
+cd ~/my-python-modules/ldsc/
+source activate ldsc
+
+## Munging the sumstats using the munge_sumstats.py script from LDSC software
+./munge_sumstats.py \
+--out frq_SZ-CLOZUK \
+--merge-alleles clozuk_pgc2.meta.sumstats.info9.snplist.txt.gz \
+--frq Freq.A1 \
+--N-con 64643.0 \
+--N-cas 40675.0 \
+--sumstats clozuk_pgc2.meta.sumstats.txt.gz
+
+## Modifying the munged sumstats to actually work with LDSC. In order to do this, only SNPs with an official RS number were retained and formatted to work with LDSC. First, we pull out only lines with an official RS number, then we split the ID column so that the rs number is printed to its own column. Then we keep columns 1-5.
+gunzip -c frq_SZ-CLOZUK.sumstats.gz | grep "rs*" | awk -F ":" '$1=$1' OFS="\t" | cut -f1,5- > tmp.frq_SZ-CLOZUK.sumstats
+
+## Adding the appropriate header on to the temporary sumstats
+gunzip -c frq_SZ-CLOZUK.sumstats.gz | head -1 | cat - tmp.frq_SZ-CLOZUK.sumstats > final.frq_SZ-CLOZUK.sumstats
+
+## gzipping the sumstats to be used in LDSC
+gzip final.frq_SZ-CLOZUK.sumstats

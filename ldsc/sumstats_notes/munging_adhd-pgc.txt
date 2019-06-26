@@ -1,0 +1,13 @@
+adhd 2019
+
+# Downloaded ADHD download from the click through agreement
+https://www.med.unc.edu/pgc/results-and-downloads
+
+# Created md5 file from numbers on https://www.med.unc.edu/pgc/results-and-downloads
+
+# From ReadMe fle: 
+# adhd_eur_jun2017.gz: European ancestry meta-analysis (19,099 cases, 34,194 controls)
+# A1 allele is the effet allele
+# INFO score is included so I will not need to merge with a snp list
+
+~/my-python-modules/ldsc/munge_sumstats.py --sumstats adhd_eur_jun2017.gz --out ADHD_PGC --N-cas 19099 --N-con 34194

@@ -1,0 +1,29 @@
+Downloading Alkes Group data
+
+wget -r -np -R "index.html*" https://data.broadinstitute.org/alkesgroup/UKBB/UKBB_409K/
+
+- removed:
+body_BMIz.sumstats.gz
+body_HEIGHTz.sumstats.gz
+cov_EDU_COLLEGE.sumstats.gz
+cov_EDU_YEARS.sumstats.gz
+mental_NEUROTICISM.sumstats.gz
+disease_T2D.sumstats.gz
+
+- Sumstats contain A1, A2, Beta, N, INFO, and allele freq. Should be able to munge this pretty easily.
+
+
+- Munged in this way
+python ~/my-python-modules/ldsc/munge_sumstats.py \
+--sumstats $i \
+--out munged_${i%.sumstats.gz}
+
+- These following sumstats could not be munged due to DType of P column. I will just move on since none of these are really that interesting
+munged_blood_MEAN_CORPUSCULAR_HEMOGLOBIN.log
+munged_blood_MEAN_PLATELET_VOL.log
+munged_blood_PLATELET_COUNT.log
+munged_blood_PLATELET_DISTRIB_WIDTH.log
+munged_blood_RED_COUNT.log
+munged_bmd_HEEL_TSCOREz.log
+munged_pigment_HAIR.log
+munged_pigment_TANNING.log

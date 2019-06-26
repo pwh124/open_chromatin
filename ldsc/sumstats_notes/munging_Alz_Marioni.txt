@@ -1,0 +1,20 @@
+alz
+
+# I decided to use a new Alz analysis that meta-analyzed IGAP Alz data along with UKBB data. Marioni et al, Translational Psychiatry, 2018  (https://www.nature.com/articles/s41398-018-0150-6)
+
+wget http://www.psy.ed.ac.uk/ccace/downloads/UKB_AD_sumstats_17May2018.zip
+
+unzip UKB_AD_sumstats_17May2018.zip
+
+# I looked at the README file in download and the summary stats contain:
+SNP
+A1 (Effect allele)
+Beta (signed summary stat)
+
+# It does not contain sample size
+# From the paper: GWAS summary output from the meta-analysis of UK Biobank and IGAP (sample size specified as 314,278 + 74,046 = 388,324)
+
+# It does not contain INFO. Will merge with the LDSC alleles
+
+python ~/my-python-modules/ldsc/munge_sumstats.py --sumstats 4_UK_Biobank_IGAP_17May2018 --merge-alleles ../../../w_hm3.snplist  --out ../Alz_Marioni --N-con 314278 --N-cas 74046
+

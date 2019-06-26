@@ -1,0 +1,12 @@
+mdd 2018
+
+# Downloaded mdd 2018 download from the click through agreement
+https://www.med.unc.edu/pgc/results-and-downloads
+
+# Created md5 file from numbers on https://www.med.unc.edu/pgc/results-and-downloads
+
+# Nca and Nco included for each SNP
+# A1 allele is the effet allele
+# INFO score is included so I will not need to merge with a snp list
+
+python ~/my-python-modules/ldsc/munge_sumstats.py --sumstats MDD2018_ex23andMe.gz --out MDD-2018 --daner-n

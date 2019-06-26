@@ -1,0 +1,39 @@
+BP-SCZ PGC paper
+
+- All of these sumstats come from this paper:
+Genomic Dissection of Bipolar Disorder and Schizophrenia, Including 28 Subphenotypes
+
+- The advantage of using this paper is that it is essentially the PGC schizophrenia GWAS so I can essentially use it as a check on the CLOZUK GWAS. Additionally it provides bipolar vs. controls, bp/sz vs. controls, and sz v. bp. These additional GWASs will give us the ability to further dissect the cell types underlying one and both disorders.
+
+From readme:
+BDSCZvsCONT.sumstats.gz: Bipolar disorder cases (n=20,129) combined with schizophrenia cases (n=33,426)
+against controls (n=54,065):
+BDvsCONT.sumstats.gz: Bipolar disorder cases (n=20,129) against an independent bipolar specific set of
+controls (n=21,524):
+SCZvsCONT.sumstats.gz: Schizophrenia cases (n=33,426) against an independent schizophrenia specific set of
+controls (n=32,541)
+SCZvsBD.sumstats.gz: A subset of schizophrenia cases (n=23,585) and bipolar disorder cases (n=15,270)
+matched for ancestry and genotyping array platform.
+
+These files all have the same format and headers
+CHR: Chromosome
+SNP: Variant
+BP: Genomic position
+A1: Effect allele (used for frequency and OR)
+A2: Non-effect allele
+FRQ_A: Frequency in cases (header includes number of cases)
+FRQ_U: Frequency in controls (header includes number of controls)
+INFO : Information score representing quality of imputation
+OR: Odds ratio based on A1
+SE: Standard error
+P: P-value
+Direction: Direction of effect of each included cohort
+HetPVa: Heterogeneity test p-value across included cohorts
+
+- I should just be able to use the "daner" setting for this
+
+~/my-python-modules/ldsc/munge_sumstats.py --sumstats BDSCZvsCONT.sumstats.gz --out munged_BDSCZvsCONT --daner
+~/my-python-modules/ldsc/munge_sumstats.py --sumstats BDvsCONT.sumstats.gz --out munged_BDvsCONT --daner
+~/my-python-modules/ldsc/munge_sumstats.py --sumstats SCZvsCONT.sumstats.gz --out munged_SZvsCONT --daner
+~/my-python-modules/ldsc/munge_sumstats.py --sumstats SCZvsBD.sumstats.gz --out munged_SZvsBD --daner
+

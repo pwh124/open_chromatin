@@ -1,0 +1,28 @@
+epilepsy
+
+From readme file:
+# Marker    - this is the marker name
+# Allele1   - the first allele for this marker in the first file where it occurs
+# Allele2   - the second allele for this marker in the first file where it occurs
+# Weight    - the sum of the individual study weights (typically, N) for this marker
+# Z-score   - the combined z-statistic for this marker
+# P-value   - meta-analysis p-value
+# Direction - summary of effect direction for each study, with one '+' or '-' per study
+# HetISq    - I^2 statistic which measures heterogeneity on scale of 0-100%
+# HetChiSq  - chi-squared statistic in simple test of heterogeneity
+# df        - degrees of freedom for heterogeneity statistic
+# HetPVal   - P-value for heterogeneity statistic
+
+# Even though this study includes some cohorts of African-American descent, we will still use it
+
+# Since there is no INFO information, I will merge these with the alleles
+
+# I will also treat a1 as the effect allele that the z-score is referring to
+
+~/my-python-modules/ldsc/munge_sumstats.py --sumstats ILAE_All_Epi_11.8.14.txt.gz --out Epilepsy_All --N-col Weight --snp MarkerName --merge-alleles ../../w_hm3.snplist 
+
+~/my-python-modules/ldsc/munge_sumstats.py --sumstats ILAE_Focal_5.8.14.txt.gz --out Epilepsy_Focal --N-col Weight --snp MarkerName --merge-alleles ../../w_hm3.snplist
+# Mean ChiSq potentially too small
+
+~/my-python-modules/ldsc/munge_sumstats.py --sumstats ILAE_GGE_5.8.14.txt.gz --out Epilepsy_GGE --N-col Weight --snp MarkerName --merge-alleles ../../w_hm3.snplist  
+

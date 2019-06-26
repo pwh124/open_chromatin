@@ -1,0 +1,376 @@
+---
+title: "ldsc-analysis"
+author: "Paul Hook"
+date: "01-22-2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r reading in the data}
+library(here)
+library(tidyverse)
+
+dat <- here("data","2019_Hook-LDSC_results.txt")
+gwas.names <- here("data","2019_LDSC_phenotypes.txt")
+peaks <- here("filter2_peak-counts.txt")
+
+#load data
+ldsc.atac <- read.delim(dat,header = T ,sep = "\t")
+ldsc.names <- read.delim(gwas.names,header = F, sep = "\t",col.names = c("GWAS","pheno","blank.1","blank.2")) %>% dplyr::select(GWAS,pheno)
+ldsc.peaks <- read.delim(peaks,header = F, sep = ",",col.names = c("Name","peak.count","file"))
+
+#merge and get rid of file name column
+ldsc.tmp <- merge(x=ldsc.atac,y=ldsc.names,by="GWAS") %>% dplyr::select(-GWAS)
+ldsc.dat <- merge(x=ldsc.tmp,y=ldsc.peaks,by="Name") %>% dplyr::select(-file)
+
+levels(ldsc.dat$Name)
+
+# Needed to recode Excitatory II-III
+ldsc.final <- ldsc.dat %>% 
+  mutate(Name = recode(Name, "Excitatory_Layer_II" = "Excitatory_Layers_II-III"))
+levels(ldsc.final$Name)
+```
+
+```{r, formatting}
+# Calculating -log10(P)
+ldsc.final$p.log10 <- -log10(ldsc.final$Coefficient_P_value)
+#peak.final$p.log10 <- -log10(peak.final$Coefficient_P_value)
+
+# Replacing all underscores in cell population names with spaces
+final.ldsc.final <- ldsc.final %>%
+  dplyr::mutate(cell.pop = as.factor(str_replace_all(Name,"_"," "))) %>%
+  dplyr::select(-Name) %>%
+  {.}
+
+levels(final.ldsc.final$cell.pop)
+levels(final.ldsc.final$pheno)
+```
+
+# This will hopefully convince people that the correlation between number of peaks and LDSC result is random and does not really mean anything.
+```{r peak-count correlations}
+peak.cor <- final.ldsc.final %>%
+  group_by(pheno) %>%
+  summarise(cor = cor(peak.count,p.log10,method = "spearman")) %>%
+  mutate(mycolor= ifelse(cor>0, "blue","red"))
+
+pheno.cor <- ggplot(peak.cor, aes(reorder(pheno,-cor),cor)) +
+  geom_col(aes(fill=mycolor)) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1,color="black",vjust = 0.5),
+        axis.title.x = element_blank(),
+        plot.title = element_text(hjust = 0.5)) +
+  guides(fill=F) + 
+  ggtitle("Spearman correlation between number of peaks and -log10(P-values) for all traits studied") +
+  ylab("Spearman rho")
+
+ggsave("2019-02-04_pheno-cor.tiff",plot = pheno.cor, dpi="retina",width = 12, height =6)
+```
+
+# This will be used to show that LDSC results are pretty much what we would expect.
+```{r grouping-by-results}
+cor.dat <- final.ldsc.final %>% 
+  dplyr::select(-Coefficient,-Coefficient_std_error,-Coefficient_P_value,-peak.count) %>%
+  spread(cell.pop,p.log10) %>%
+  {.}
+
+cor.dat.names <- cor.dat
+
+row.names(cor.dat.names) <- cor.dat.names$pheno
+cor.dat.names <- cor.dat.names[,-1]
+
+cor.matrix <- as.matrix(cor.dat.names)
+
+text.mat <- replace(cor.matrix, cor.matrix < 4.538574, " ")
+text.mat2 <- replace(text.mat, text.mat != " ", "*")
+
+library(pheatmap)
+library(RColorBrewer)
+# Heatmap will be clustered by correlation. Z-scores will be used to make a conclusion about which cells tend to have lower P-values.
+pheno.map <- pheatmap(cor.matrix,
+         clustering_method = "ward.D2",
+         cluster_rows = T, cluster_cols = T,
+         scale = "row",
+         color = rev(brewer.pal(11,"RdYlBu")),
+         cellwidth = 10,
+         cellheight = 7,
+         fontsize = 7,
+         cutree_rows = 3, cutree_cols = 3,
+         main = "Hierarchial clustering of -log10(P-values) Z-score by Euclidean distance",
+         angle_col = "45",
+         number_color = "black",
+         display_numbers = text.mat2,
+         fontsize_number = 10,
+         fontface="bold")
+
+ggsave("2019-04-14_LDSC-heatmap.tiff",plot = pheno.map, dpi="retina",width = 8, height = 9)
+ggsave("2019-04-14_LDSC-heatmap.pdf",plot = pheno.map, dpi="retina",width = 8, height = 9)
+
+```
+
+# This will be used to show that LDSC results are pretty much what we would expect.
+```{r grouping-by-results}
+cor.dat.coefficient <- final.ldsc.final %>% 
+  dplyr::select(-Coefficient_std_error,-Coefficient_P_value,-peak.count,-p.log10) %>%
+  spread(cell.pop,Coefficient) %>%
+  {.}
+
+cor.dat.names.co <- cor.dat.coefficient
+
+row.names(cor.dat.names.co) <- cor.dat.names.co$pheno
+cor.dat.names.co <- cor.dat.names.co[,-1]
+
+cor.matrix.co <- as.matrix(cor.dat.names.co)
+```
+
+
+# This will show that our LDSC results from mouse data lifted over to human data give us roughly what we would expect from human results processed the same way.
+```{r tcell_correlation}
+cd8.cor <- cor.test(cor.dat.names$`CD8 T-cells`,cor.dat.names$`CD8 T-cells human`, method = "spearman", conf.level = 0.95)
+scatter_plot <- ggplot(cor.dat.names, aes(`CD8 T-cells`, `CD8 T-cells human`))
+cd8.plot <- scatter_plot +
+  geom_vline(xintercept = 4.538574,color="grey40",linetype=2) + 
+  geom_hline(yintercept = 4.538574,color="grey40",linetype=2) +
+  geom_point(size=2) +
+  labs(x = "mouse-to-human CD8, -log10(P-values)", y = "human CD8, -log10(P-values)") +
+  geom_smooth(method="lm") + theme_classic() +
+  ggtitle("CD8 T-cells") +
+  annotate("text",x=1.5,y=7,label=paste("Spearman's rho\n",round(cd8.cor$estimate[[1]],4))) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ylim(-0.5,10) + xlim(0,10)
+
+cd4.cor <- cor.test(cor.dat.names$`CD4 T-cells`,cor.dat.names$`CD4 T-cells human`, method = "spearman", conf.level = 0.95)
+scatter_plot <- ggplot(cor.dat.names, aes(`CD4 T-cells`, `CD4 T-cells human`))
+cd4.plot <- scatter_plot +
+  geom_vline(xintercept = 4.538574,color="grey40",linetype=2) + 
+  geom_hline(yintercept = 4.538574,color="grey40",linetype=2) +
+  geom_point(size=2) +
+  labs(x = "mouse-to-human CD4, -log10(P-values)", y = "human CD4, -log10(P-values)") +
+  geom_smooth(method="lm") + theme_classic() +
+  ggtitle("CD4 T-cells") +
+  annotate("text",x=1.5,y=7,label=paste("Spearman's rho\n",round(cd4.cor$estimate[[1]],4))) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ylim(-0.5,10) + xlim(0,10)
+
+library(patchwork)
+cd.plot <- cd4.plot + cd8.plot
+
+ggsave("2019-02-04_cd4-cor.tiff",plot = cd.plot, dpi="retina",width = 10, height = 4)
+
+# Do this based on coefficient
+cd8.cor.co <- cor.test(cor.dat.names.co$`CD8 T-cells`,cor.dat.names.co$`CD8 T-cells human`, method = "spearman", conf.level = 0.95)
+scatter_plot <- ggplot(cor.dat.names.co, aes(`CD8 T-cells`, `CD8 T-cells human`))
+cd8.plot.co <- scatter_plot +
+  geom_point(size=2) +
+  labs(x = "mouse-to-human CD8, Heritability regression coefficient", y = "human CD8, Heritability regression coefficient") +
+  geom_smooth(method="lm") + theme_classic() +
+  ggtitle("CD8 T-cells") +
+  annotate("text",x=0.5e-06,y=3e-06,label=paste("Spearman's rho\n",round(cd8.cor.co$estimate[[1]],4))) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  #ylim(-0.5,10) + xlim(0,10)
+  NULL
+
+cd4.cor.co <- cor.test(cor.dat.names.co$`CD4 T-cells`,cor.dat.names.co$`CD4 T-cells human`, method = "spearman", conf.level = 0.95)
+scatter_plot <- ggplot(cor.dat.names.co, aes(`CD4 T-cells`, `CD4 T-cells human`))
+cd4.plot.co <- scatter_plot +
+  #geom_vline(xintercept = 4.538574,color="grey40",linetype=2) + 
+  #geom_hline(yintercept = 4.538574,color="grey40",linetype=2) +
+  geom_point(size=2) +
+  labs(x = "mouse-to-human CD4, Heritability regression coefficient", y = "human CD4, Heritability regression coefficient") +
+  geom_smooth(method="lm") + theme_classic() +
+  ggtitle("CD4 T-cells") +
+  annotate("text",x=0.5e-06,y=3e-06,label=paste("Spearman's rho\n",round(cd4.cor.co$estimate[[1]],4))) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  #ylim(-0.5,10) + xlim(0,10)
+  NULL
+
+library(patchwork)
+cd.plot.co <- cd4.plot.co + cd8.plot.co
+
+ggsave("2019-04-14_cd-coefficient.tiff",plot = cd.plot.co, dpi="retina",width = 10, height = 4)
+```
+
+
+```{r}
+# Arranging the columns how I want them
+final.ldsc.final$cell_ordered <- factor(final.ldsc.final$cell.pop, c("Microglia","Microglia*","Astrocytes*","Oligodendrocyte*","Neun negative","Excitatory Camk2a","Excitatory Layers II-III","Excitatory Layer IV","Excitatory Layer V","Excitatory Layers II-V*","Excitatory Layer VI","Excitatory Layer VI*","Excitatory DG*","Inhibitory Gad2","Inhibitory*","Inhibitory PV","Inhibitory VIP","Inhibitory MSN*","Embryonic DA forebrain","Embryonic DA midbrain","Cones (blue)","Cones (green)","Rods","CD4 T-cells","CD4 T-cells human","CD8 T-cells","CD8 T-cells human"))
+
+levels(final.ldsc.final$cell.pop)
+levels(final.ldsc.final$cell_ordered)
+
+final.ldsc.final.types <- final.ldsc.final %>%
+  dplyr::mutate(type = if_else(grepl("microglia|astrocytes|oligo|neun",cell_ordered,ignore.case = T),"Glia",
+                               if_else(grepl("ex|cux2|scnn1a|rbp4|ntsr1",cell_ordered,ignore.case = T),"Excitatory neurons",
+                                       if_else(grepl("inhib|gaba",cell_ordered,ignore.case = T),"Inhibitory neurons",
+                                              if_else(grepl("forebrain|midbrain",cell_ordered,ignore.case = T),"Dopaminergic neurons",
+                                                      if_else(grepl("blue|green|rod",cell_ordered,ignore.case = T),"Retina cells",
+                                                              if_else(grepl("cd4|cd8",cell_ordered,ignore.case = T),"T-cells","NA")))))))
+
+final.ldsc.final.types$type <- factor(final.ldsc.final.types$type, levels=c("Glia","Excitatory neurons","Inhibitory neurons","Dopaminergic neurons","Retina cells","T-cells"))
+
+levels(final.ldsc.final.types$type)
+```
+
+```{r write_out}
+# I need to write out the results in a more intuitive way
+full.ldsc.results <- final.ldsc.final.types %>%
+  dplyr::select(cell.population=cell_ordered,type,pheno,Coefficient,Coefficient_std_error,Coefficient_P_value,p.log10) %>%
+  dplyr::mutate(signif.all=if_else(p.log10 >= -log10(0.05/(27*64)),"yes","no")) %>%
+  arrange(desc(p.log10))
+
+levels(full.ldsc.results$cell.population)
+
+split.results <- split(full.ldsc.results,full.ldsc.results$pheno)
+
+require(openxlsx)
+write.xlsx(split.results, file = here("data","ldsc.results_2019-04-24.xlsx"))
+```
+
+```{r making some plots}
+col <- c(Glia="#4DAF4A",
+         `Excitatory neurons`="#377EB8",
+         `Inhibitory neurons`="#984EA3",
+         `Dopaminergic neurons`="#E41A1C",
+         `Retina cells`="#FF7F00",
+         `T-cells`="#F781BF")
+
+gwas.levels <- levels(final.ldsc.final.types$pheno)
+final.ldsc.final.types$cell_ordered2 <- with(final.ldsc.final.types, factor(cell_ordered, levels = rev(levels(cell_ordered))))
+
+clozuk.sz <- ggplot(final.ldsc.final.types %>% dplyr::filter(pheno=="Schizophrenia - CLOZUK"),
+            aes(x=cell_ordered2,y=p.log10, color=type)) +
+  geom_hline(yintercept=-log10(0.05/(27*64)), color="blue", linetype="dashed", lwd=0.5, alpha = 0.75) +
+  geom_point(size=3) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  ggtitle("Schizophrenia (CLOZUK)") + ylim(0,20) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=12,family="Helvetica", vjust = -1),
+        axis.text.x = element_text(size=10,colour = "black",family = "Helvetica",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        #plot.title = element_blank(),
+        legend.text = element_text(size = 10,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+height <- ggplot(final.ldsc.final.types %>% dplyr::filter(pheno=="Height"),
+            aes(x=cell_ordered2,y=p.log10, color=type)) +
+  geom_hline(yintercept=-log10(0.05/(27*64)), color="blue", linetype="dashed", lwd=0.5, alpha = 0.75) +
+  geom_point(size=3) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  ggtitle("Height (GIANT)") + ylim(0,20) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=12,family="Helvetica", vjust = -1),
+        axis.text.x = element_text(size=10,colour = "black",family = "Helvetica",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        #plot.title = element_blank(),
+        legend.text = element_text(size = 10,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+sz.pgc <- ggplot(final.ldsc.final.types %>% dplyr::filter(pheno=="SZ vs. Cont"),
+            aes(x=cell_ordered2,y=p.log10, color=type)) +
+  geom_hline(yintercept=-log10(0.05/(27*64)), color="blue", linetype="dashed", lwd=0.5, alpha = 0.75) +
+  geom_point(size=3) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  ggtitle("Schizophrenia (PGC)") + ylim(0,20) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=12,family="Helvetica", vjust = -1),
+        axis.text.x = element_text(size=10,colour = "black",family = "Helvetica",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        #plot.title = element_blank(),
+        legend.text = element_text(size = 10,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+sz.bd <- ggplot(final.ldsc.final.types %>% dplyr::filter(pheno=="SZ vs. BD"),
+            aes(x=cell_ordered2,y=p.log10, color=type)) +
+  geom_hline(yintercept=-log10(0.05/(27*64)), color="blue", linetype="dashed", lwd=0.5, alpha = 0.75) +
+  geom_point(size=3) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  ggtitle("Schizophrenia vs. Bipolar disorder") + ylim(0,20) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=12,family="Helvetica", vjust = -1),
+        axis.text.x = element_text(size=10,colour = "black",family = "Helvetica",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        #plot.title = element_blank(),
+        legend.text = element_text(size = 10,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+bp.sz.controls <- ggplot(final.ldsc.final.types %>% dplyr::filter(pheno=="Bipolar-SZ vs. controls"),
+            aes(x=cell_ordered2,y=p.log10, color=type)) +
+  geom_hline(yintercept=-log10(0.05/(27*64)), color="blue", linetype="dashed", lwd=0.5, alpha = 0.75) +
+  geom_point(size=3) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  ggtitle("Schizophrenia and bipolar disorder vs. controls") + ylim(0,20) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=12,family="Helvetica", vjust = -1),
+        axis.text.x = element_text(size=10,colour = "black",family = "Helvetica",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        #plot.title = element_blank(),
+        legend.text = element_text(size = 10,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+bp <- ggplot(final.ldsc.final.types %>% dplyr::filter(pheno=="Bipolar disorder"),
+            aes(x=cell_ordered2,y=p.log10, color=type)) +
+  geom_hline(yintercept=-log10(0.05/(27*64)), color="blue", linetype="dashed", lwd=0.5, alpha = 0.75) +
+  geom_point(size=3) +
+  theme_classic() + theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 0.70)) +
+  ggtitle("Bipolar disorder vs. controls") + ylim(0,20) +
+  ylab("-log10(coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  theme(legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=12,family="Helvetica", vjust = -1),
+        axis.text.x = element_text(size=10,colour = "black",family = "Helvetica",vjust = 1.1),
+        axis.text.y = element_text(size = 10,colour = "black",family = "Helvetica"),
+        axis.title.x = element_text(size=12,color = "black",family = "Helvetica")) +
+  coord_flip() +
+  theme(panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        #plot.title = element_blank(),
+        legend.text = element_text(size = 10,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'mm'),
+        legend.spacing.x = unit(0.1,'mm'),
+        legend.background = element_blank())
+
+ggsave("2019-04-13_bipolar.tiff",plot = bp, dpi="retina",width =6, height = 5)
+ggsave("2019-04-13_bd-sz.tiff",plot = bp.sz.controls, dpi="retina",width =6, height = 5)
+ggsave("2019-04-13_sz-vs-bd.tiff",plot = sz.bd, dpi="retina",width =6, height = 5)
+ggsave("2019-04-13_sz-pgc.tiff",plot = sz.pgc, dpi="retina",width =6, height = 5)
+ggsave("2019-04-13_sz-clozuk.tiff",plot = clozuk.sz, dpi="retina",width =6, height = 5)
+ggsave("2019-04-13_height.tiff",plot = height, dpi="retina",width =6, height = 5)
+```
+
+

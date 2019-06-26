@@ -1,0 +1,72 @@
+---
+title: "upsetR"
+author: "Paul Hook"
+date: "5/1/2019"
+output: html_document
+---
+
+```{r}
+library(UpSetR)
+library(here)
+```
+
+```{r}
+overlapInput <- c(`Mouse-derived CD8` = 38299,
+                  `Mouse-derived CD8&Human CD8 ATAC-seq` = 16674,
+                  `Mouse-derived CD8&Human Naive CD8 DNase-seq` = 22927,
+                  `Mouse-derived CD8&Human Memory CD8 DNase-seq` = 22689,
+                  `Mouse-derived CD8&Human T-cell DNase-seq` = 23698,
+                  `Mouse-derived CD8&All Roadmap DNase-seq` = 31757,
+                  `Mouse-derived CD8&Human CD8 ATAC-seq&All Roadmap DNase-seq` = 31796)
+
+test <- fromExpression(overlapInput)
+upset(test,
+      sets = c("All Roadmap DNase-seq","Human T-cell DNase-seq","Human Memory CD8 DNase-seq","Human Naive CD8 DNase-seq","Human CD8 ATAC-seq","Mouse-derived CD8"),
+      order.by = "degree",
+      line.size = 2,
+      mb.ratio = c(0.55, 0.45),main.bar.color = "#006400",text.scale = 1.75,keep.order = TRUE,
+      decreasing = FALSE,point.size = 8,mainbar.y.label = "Number of open chromatin peaks",
+      matrix.color = "black")
+
+pdf(file = "cd8.upset.pdf",width = 6,height = 4)
+upset(test,
+      sets = c("All Roadmap DNase-seq","Human T-cell DNase-seq","Human Memory CD8 DNase-seq","Human Naive CD8 DNase-seq","Human CD8 ATAC-seq","Mouse-derived CD8"),
+      order.by = "degree",
+      line.size = 0.75,
+      #mb.ratio = c(0.55, 0.45),
+      main.bar.color = "#006400",text.scale = 1,keep.order = TRUE,
+      decreasing = FALSE,point.size = 2,mainbar.y.label = "Number of open chromatin peaks",
+      matrix.color = "black")
+dev.off()
+
+```
+
+Take an example from one of the neurons - CUX2 in this case
+```{r}
+overlapInput <- c(`Excitatory Layers II-III` = 65021,
+                  `Excitatory Layers II-III&All Roadmap DNase-seq` = 47694,
+                  `Excitatory Layers II-III&Brain Roadmap DNase-seq` = 38881,
+                  `Excitatory Layers II-III&BOCA ATAC-seq` = 34178,
+                  `Excitatory Layers II-III&All Roadmap DNase-seq&BOCA ATAC-seq` = 51525)
+
+test <- fromExpression(overlapInput)
+upset(test,
+      sets = c("BOCA ATAC-seq","Brain Roadmap DNase-seq","All Roadmap DNase-seq","Excitatory Layers II-III"),
+      order.by = "degree",
+      line.size = 2,
+      mb.ratio = c(0.55, 0.45),main.bar.color = "#006400",text.scale = 1.75,keep.order = TRUE,
+      decreasing = FALSE,point.size = 8,mainbar.y.label = "Number of open chromatin peaks",
+      matrix.color = "black")
+
+pdf(file = "neuron.upset.pdf",width = 5,height = 4)
+upset(test,
+      sets = c("BOCA ATAC-seq","Brain Roadmap DNase-seq","All Roadmap DNase-seq","Excitatory Layers II-III"),
+      order.by = "degree",
+      line.size = 0.75,
+      #mb.ratio = c(0.55, 0.45),
+      main.bar.color = "#006400",text.scale = 1,keep.order = TRUE,
+      decreasing = FALSE,point.size = 2,mainbar.y.label = "Number of open chromatin peaks",
+      matrix.color = "black")
+dev.off()
+
+```

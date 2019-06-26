@@ -1,0 +1,64 @@
+## Creating peaks, merging, and getting peak counts ##
+
+# In order to compare the mouse samples, peak counts followed by dimensionality reduction using principle component analysis was used. #
+
+# Adding +/- 250 on to the summits and sorting
+
+for i in `ls -v filter2*`; do cat $i | awk 'BEGIN {FS="\t";OFS="\t"} {print $1,$2-250,$3+250,$4}' | sort -k1,1 -k2,2n > mod_${i}; done
+
+# Making sure everything is sorted and merging the peaks in each file
+
+for i in `ls -v mod*`; do sort -k1,1 -k2,2n $i | bedtools merge -c 4 -o count -i - > merged_${i}; done
+
+# Modifying the data so that the sizes of fragments can be compared
+
+for i in `ls -v merged*`; do awk 'BEGIN {FS="\t";OFS="\t"} {print $1,$2,$3,$3-$2}' $i > size_${i}; done
+
+# Excluding everything overlapping with mouse blacklist region
+
+for i in `ls -v size*`; do sort -k1,1 -k2,2n $i | bedtools intersect -a - -b ~/data/PWH/public_atac_data/atac-data/blacklists/mm10_atac-encode_blacklist.bed -v > cleaned_${i}; done
+
+# files were renamed to start with 'filter2'
+
+rename "cleaned_size_merged_mod_" "" *
+
+# Creating a master peak set
+
+cat filter2* | sort -k1,1 -k2,2n | bedtools merge -i - > filter2_merged-peaks.bed
+
+# Format the master peak file like a .SAF file for the SubRead program to use
+
+awk '{print $1,$2,$3}' filter2_merged-peaks.bed | awk '$4=(FS"peak_"FNR)' | awk '$5=(FS"+")' | awk -v OFS='\t' '{print $4,$1,$2,$3,$5}' > tmp.filter_merged-peaks.bed
+
+# Adding correct file header needed 
+echo -e "GeneID\tChr\tStart\tEnd\tStrand" | cat - tmp.filter_merged-peaks.bed > filter2_merged-peaks.SAF
+
+# Removing temporary files
+rm tmp.filter_merged-peaks.bed 
+
+# Making peak set for GC content calculation
+
+awk -v OFS='\t' '{print $2,$3,$4,$1}' filter2_merged-peaks.SAF | tail -n +2 > peaks_for_GC.bed
+
+# Calculating GC content
+bedtools nuc -fi ../fasta/ucsc_goldenpath_mm10.fa -bed peaks_for_GC.bed > 2019_gc.bed
+
+# Running SubRead feature count. Script included.
+
+sbatch featureCounts.sh
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

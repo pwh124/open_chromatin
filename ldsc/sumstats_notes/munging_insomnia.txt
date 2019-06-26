@@ -1,0 +1,23 @@
+insomnia 
+
+From readme:
+# Header information:
+Columns (not all are present for each sumstats file, see note bottom of file):
+SNP: rsID of the variant
+UNIQUE_ID: unique SNP ID based on chromosome, position and alleles
+CHR: chromosome number
+BP: base pair position reported on GRCh37
+A1: effect allele
+A2: non-effect allele
+MAF: Minor allele frequency
+OR: odds ratio related to the effect allele
+SE: standard error
+P: P-value
+N: per-SNP sample size
+INFO: info score (SNP quality measure)
+
+- I probably won't have to give munge anything special.
+
+./munge_sumstats.py \
+--out insomnia-2018 \
+--sumstats Insomnia_sumstats_Jansenetal.txt.gz 

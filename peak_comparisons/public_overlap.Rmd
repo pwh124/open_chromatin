@@ -1,0 +1,49 @@
+---
+title: "peak overlap"
+author: "Paul Hook"
+date: "4/15/2019"
+output: html_document
+---
+
+```{r loading_data}
+library(dplyr)
+library(readr)
+library(here)
+
+# load peak data
+num.peaks <- read.delim2(here::here("hg19_peak_counts.txt"),
+                         sep = "", header = FALSE,col.names = c("all_peaks","sample"))
+
+# load overlap data
+boca <- read.delim2(here::here("final_boca_overlap.txt"),
+                    sep= ":", header = FALSE, col.names = c("boca_sample","boca_peaks"))
+
+roadmap <- read.delim2(here::here("final_roadmap_overlap.txt"),
+                    sep= ":", header = FALSE, col.names = c("roadmap_sample","roadmap_peaks"))
+
+roadmap_brain <- read.delim2(here::here("final_roadmap_brain_overlap.txt"),
+                    sep= ":", header = FALSE, col.names = c("roadmap_brain_sample","roadmap_brain_peaks"))
+
+combined <- read.delim2(here::here("final_combined_overlap.txt"),
+                        sep = ":", header = FALSE, col.names = c("combined_sample","combined_peaks"))
+
+# bind them
+overlaps <- cbind(num.peaks,boca,roadmap,roadmap_brain,combined) %>%
+  dplyr::select(sample,all_peaks,roadmap_peaks,roadmap_brain_peaks,boca_peaks,combined_peaks) %>%
+  dplyr::mutate(roadmap_percent = roadmap_peaks/all_peaks,
+                roadmap_brain_percent = roadmap_brain_peaks/all_peaks,
+                boca_percent = boca_peaks/all_peaks,
+                combined_percent=combined_peaks/all_peaks)
+
+# Loading annotation
+anno <- read.delim2(here::here("sample-anno.txt"),
+                    header = FALSE, col.names = c("sample","population"))
+
+# merging and organizing
+test <- merge(x=anno,y=overlaps,by = "sample") %>%
+  dplyr::select(population,total_peaks=all_peaks,roadmap_peaks,roadmap_percent,roadmap_brain_peaks,roadmap_brain_percent,boca_peaks,boca_percent,combined_peaks,combined_percent)
+
+
+# write out
+write.table(test, here::here("overlap_comparisons.txt"),quote = FALSE,sep = "\t",row.names = FALSE,col.names = TRUE)
+```

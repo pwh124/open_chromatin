@@ -1,0 +1,18 @@
+height
+
+wget https://portals.broadinstitute.org/collaboration/giant/images/0/01/GIANT_HEIGHT_Wood_et_al_2014_publicrelease_HapMapCeuFreq.txt.gz
+
+# This file contains a signed sumstats. From GIANT website:
+# Allele1: The first allele (hg19 + strand). Where the regression coefficients (betas) are # provided, the first allele is the effect allele. Where betas are not provided (typically # the 2010 data), the first allele is the trait-increasing allele.
+
+# So no need to use --a1-inc
+
+# It does not have an INFO column so I will merge with the snplist that Bulik suggests (https://github.com/bulik/ldsc/wiki/Heritability-and-Genetic-Correlation)
+
+~/my-python-modules/ldsc/munge_sumstats.py --sumstats GIANT_HEIGHT_Wood_et_al_2014_publicrelease_HapMapCeuFreq.txt.gz --merge-alleles ../../w_hm3.snplist  --out Height-GIANT
+
+## 01-30-19 ##
+
+I realized I didn’t use the allele frequencies to filter
+
+python ~/my-python-modules/ldsc/munge_sumstats.py --sumstats GIANT_HEIGHT_Wood_et_al_2014_publicrelease_HapMapCeuFreq.txt.gz --merge-alleles ../../w_hm3.snplist --out frq_Height-GIANT --frq Freq.Allele1.HapMapCEU

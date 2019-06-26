@@ -1,0 +1,16 @@
+intelligence
+
+# Downloaded data from https://www.thessgac.org/data. It links to a Dropbox so I will just keep the base URL for now. The file is named "GWAS_EA_excl23andMe.txt"
+
+wget http://ssgac.org/documents/README_EA3.txt
+
+# From the paper: 
+# All cohort-level analyses were restricted to individuals of European ancestry that #passed the quality control of the cohort and for whom EduYears was measured at an age of #at least 30.
+
+#Details on cohort-level phenotype measures, genotyping, imputation, association analyses #and quality-control filters are described in Supplementary Tables 16–19.
+
+# However no imputation statistics are provided. In supplemental note, they filter out SNPs INFO < 0.3 but no other information provided. Therefore I will merge with alleles. Also need N.
+
+# In ReadMe: Sample Size = 766,345
+
+~/my-python-modules/ldsc/munge_sumstats.py --sumstats GWAS_EA_excl23andMe.txt --merge-alleles ../../w_hm3.snplist  --out Intelligence-2018 --N 766345

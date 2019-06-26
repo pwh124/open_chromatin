@@ -1,0 +1,252 @@
+---
+title: "paper_peaks"
+author: "Paul Hook"
+date: "4/13/2019"
+output: html_document
+---
+
+```{r loading_data}
+library(dplyr)
+library(here)
+library(readr)
+
+# load mouse peaks
+mouse.peaks <- read_delim(here::here("mouse-peaks.bed"),delim = '\t',
+                     col_names = c("chr","start","end","peak.name")) %>%
+  dplyr::mutate(mouse.length=end-start) %>%
+  dplyr::select(chr,start,end,mouse.length,peak.name)
+
+summary(mouse.peaks$mouse.length) 
+
+mouse.sum <- mouse.peaks %>% dplyr::summarize(total=n(),
+                            min=min(mouse.length),
+                            max=max(mouse.length),
+                            mean=mean(mouse.length),
+                            median=median(mouse.length),
+                            `<=501 bp`=sum(mouse.length <= 501),
+                            `>501 bp`=sum(mouse.length > 501),
+                            `>1000 bp`=sum(mouse.length > 1000),
+                            group="mouse")
+
+# load all peaks
+all.peaks <- read_delim(here::here("liftover","all_peaks.bed"),delim="\t",
+                   col_names = c("chr","start","end","all.length","peak.name"))
+
+summary(all.peaks$all.length)
+
+all.sum <- all.peaks %>% dplyr::summarize(total=n(),
+                            min=min(all.length),
+                            max=max(all.length),
+                            mean=round(mean(all.length)),
+                            median=median(all.length),
+                            `<=501 bp`=sum(all.length <= 501),
+                            `>501 bp`=sum(all.length > 501),
+                            `>1000 bp`=sum(all.length > 1000),
+                            group="all")
+
+# load strict peaks
+strict.peaks <- read_delim(here::here("liftover","strict_peaks.bed"),delim='\t',
+                   col_names = c("chr","start","end","strict.length","peak.name"))
+
+summary(strict.peaks$strict.length)
+
+strict.sum <- strict.peaks %>% dplyr::summarize(total=n(),
+                            min=min(strict.length),
+                            max=max(strict.length),
+                            mean=round(mean(strict.length)),
+                            median=median(strict.length),
+                            `<=501 bp`=sum(strict.length <= 501),
+                            `>501 bp`=sum(strict.length > 501),
+                            `>1000 bp`=sum(strict.length > 1000),
+                            group="strict")
+
+# load summit peaks
+summit.peaks <- read_delim(here::here("liftover","summit_peaks.bed"),delim="\t",
+                   col_names = c("chr","start","end","summit.length","peak.name")) %>%
+  dplyr::mutate(start=start-250,end=end+250) %>%
+  dplyr::mutate(length=end-start)
+
+summary(summit.peaks$length)
+
+summit.sum <- summit.peaks %>% dplyr::summarize(total=n(),
+                            min=min(length),
+                            max=max(length),
+                            mean=round(mean(length)),
+                            median=median(length),
+                            `<=501 bp`=sum(length <= 501),
+                            `>501 bp`=sum(length > 501),
+                            `>1000 bp`=sum(length > 1000),
+                            group="summit")
+
+# bind them all
+
+test <- rbind(mouse.sum,summit.sum,all.sum,strict.sum) %>%
+  dplyr::select(group,everything())
+
+write.table(test,file = "liftover-summary.txt",quote = FALSE,sep = "\t",row.names = FALSE)
+
+library(formattable)
+library(kableExtra)
+formattable(test)
+test2 <- test %>%
+  dplyr::select(group,total,min,max,mean,`<=501 bp`,`>501 bp`, `>1000 bp`)
+table <- kable(test2,"latex",booktabs=TRUE) %>%
+  row_spec(1, color = "blue") %>%
+  kable_styling(position = "left",font_size = 12)
+as_image(table,width = 4, height = 2,file = "Figure.1C_lifover_summary.pdf")
+```
+
+# Merge and graph lengths
+```{r}
+test <- merge(x=mouse.peaks,y=all.peaks,by="peak.name") %>%
+  dplyr::select(peak.name,mouse.length,all.length,"chr"=chr.y,start.y,end.y) %>%
+  dplyr::arrange(desc(all.length))
+
+sample <- head(test, 300)
+```
+
+```{r}
+library(Gviz)
+library(rtracklayer)
+library(org.Mm.eg.db)
+
+
+chr <- 'chr12'
+gen <- 'mm10'
+
+ 
+gtrack <- GenomeAxisTrack(scale=0.2)
+gtrack2 <- GenomeAxisTrack(lwd=0.5,fontsize=6)
+itrack <- IdeogramTrack(genome = gen, chromosome = chr,fontfamily="Helvetica",fontcolor="black",fontface=2,fontsize.title=8,cex.bands=0.5)
+
+#Loading peaks
+mm10.peaks <- import.bed("mod_filter2_cux2_excite_merge_GSE87548_summits.bed")
+chr12.peaks <- mm10.peaks[seqnames(mm10.peaks) == "chr12"]
+
+#Loading summits
+mm10.summits <- import.bed("cux2.mm10.summits.bed")
+chr12.summits <- mm10.summits[seqnames(mm10.summits) == "chr12"]
+
+ucscGenes <- UcscTrack(genome="mm10",
+                       table="ncbiRefSeq",
+                       track = 'NCBI RefSeq',trackType="GeneRegionTrack",
+                       chromosome=chr, rstarts = "exonStarts", rends = "exonEnds",
+                       gene = 'name', symbol = 'name', transcript = "name",strand = "strand",
+                       stacking = 'pack', showID = TRUE, geneSymbol = TRUE,
+                       name="RefSeq Transcripts")
+
+z <- ranges(ucscGenes)
+
+mcols(z)$symbol <- mapIds(org.Mm.eg.db, gsub("\\.[1-9]$", "", mcols(z)$symbol), "SYMBOL","REFSEQ")
+ucscGenes2 <- ucscGenes
+ranges(ucscGenes2) <- z
+
+displayPars(ucscGenes2) <- list(col=NULL,col.axis="black",background.title="white",fontcolor.title="black",fill="salmon",col.line="lightgrey",fontfamily="Helvetica",fontcolor.group="black",fontsize.group=10,fontsize.title=10,fontface=1,reverseStrand=FALSE,transcriptAnnotation="symbol",just.group="right",stackHeight=0.5,rotation.title=0,featureAnnotation="symbol",groupAnnotation="symbol")
+
+track1 <- AnnotationTrack(chr12.peaks,
+                          name = "Peaks",
+                          col=NULL, fontfamily="helvetica",
+                          background.title="white",
+                          fontcolor.title="black",
+                          fill="darkgreen",fontsize.title=10,
+                          rotation.title=0,stackHeight=0.25)
+
+track2 <- AnnotationTrack(chr12.summits,
+                          name = "Summits",
+                          col=NULL, fontfamily="helvetica",
+                          background.title="white",
+                          fontcolor.title="black",
+                          fill="blue",fontsize.title=10,
+                          rotation.title=0,stackHeight=0.25)
+
+
+plotTracks(list(itrack,gtrack2,track2,track1,ucscGenes2,gtrack),from = 116258915,to = 116264450,main="mm10")
+
+#Modified afterwards
+pdf(file = "mm10-wdr60-gviz.pdf",width = 4,height = 4)
+plotTracks(list(itrack,gtrack2,track2,track1,ucscGenes2,gtrack),from = 116258915,to = 116264450,main="mm10",sizes = c(0.05,0.1,0.1,0.1,0.1,0.1),title.width = 1.5,cex.main = 1)
+dev.off()
+```
+
+```{r}
+library(Gviz)
+library(rtracklayer)
+library(org.Hs.eg.db)
+
+#Loading peaks
+hg19.all.peaks <- import.bed("liftover/all/all_hg19_mod_filter2_cux2_excite_merge_GSE87548_summits.bed")
+chr7.all <- hg19.all.peaks[seqnames(hg19.all.peaks) == "chr7"]
+
+allTrack <- AnnotationTrack(chr7.all,
+                          name = "All peaks",
+                          col=NULL, fontfamily="Helvetica",
+                          background.title="white",
+                          fontcolor.title="black",
+                          fill="darkgreen",fontsize.title=10,
+                          rotation.title=0,stackHeight=0.25,stacking = "dense",
+                          shape="box")
+
+
+#Loading strict peaks
+hg19.strict.peaks <- import.bed("liftover/strict/strict_hg19_mod_filter2_cux2_excite_merge_GSE87548_summits.bed")
+chr7.strict <- hg19.strict.peaks[seqnames(hg19.strict.peaks) == "chr7"]
+
+strictTrack <- AnnotationTrack(chr7.strict,
+                          name = "Strict peaks",
+                          col=NULL, fontfamily="Helvetica",
+                          background.title="white",
+                          fontcolor.title="black",
+                          fill="darkgreen",fontsize.title=10,
+                          rotation.title=0,stackHeight=0.25,stacking = "dense")
+
+#Loading summits
+hg19.summits <- import.bed("liftover/summits/hg19_filter2_cux2_excite_merge_GSE87548_summits.bed")
+chr7.summits <- hg19.summits[seqnames(hg19.summits) == "chr7"]
+
+summitTrack <- AnnotationTrack(chr7.summits,
+                          name = "Summits",
+                          col=NULL, fontfamily="Helvetica",
+                          background.title="white",
+                          fontcolor.title="black",
+                          fill="darkgreen",fontsize.title=10,
+                          rotation.title=0,stackHeight=0.25,stacking = "squish")
+
+# Loading summit peaks
+hg19.summit.peaks <- import.bed("liftover/summits/mod/cux2_hg19_summitpeaks.bed")
+chr7.summit.peaks <- hg19.summit.peaks[seqnames(hg19.summit.peaks) == "chr7"]
+
+summitpeakTrack <- AnnotationTrack(chr7.summit.peaks,
+                          name = "Summit peaks",
+                          col=NULL, fontfamily="Helvetica",
+                          background.title="white",
+                          fontcolor.title="black",
+                          fill="darkgreen",fontsize.title=10,
+                          rotation.title=0,stackHeight=0.25,stacking = "dense")
+
+# Making gene track
+ucscGenes <- UcscTrack(genome="hg19",
+                       table="ncbiRefSeq",
+                       track = 'NCBI RefSeq',trackType="GeneRegionTrack",
+                       chromosome="chr7", rstarts = "exonStarts", rends = "exonEnds",
+                       gene = 'name', symbol = 'name', transcript = "name",strand = "strand",
+                       stacking = 'pack', showID = TRUE, geneSymbol = TRUE,
+                       name="RefSeq Transcripts")
+
+z <- ranges(ucscGenes)
+
+mcols(z)$symbol <- mapIds(org.Hs.eg.db, gsub("\\.[1-9]$", "", mcols(z)$symbol), "SYMBOL","REFSEQ")
+ucscGenes2 <- ucscGenes
+ranges(ucscGenes2) <- z
+
+displayPars(ucscGenes2) <- list(col=NULL,col.axis="black",background.title="white",fontcolor.title="black",fill="salmon",col.line="lightgrey",fontfamily="Helvetica",fontcolor.group="black",fontsize.group=10,fontsize.title=10,fontface=1,reverseStrand=FALSE,transcriptAnnotation="symbol",just.group="left",stackHeight=0.5,rotation.title=0)
+
+gtrack <- GenomeAxisTrack(scale=0.2)
+gtrack2 <- GenomeAxisTrack(lwd=0.5,fontsize=6)
+itrack <- IdeogramTrack(genome = "hg19", chromosome = "chr7",fontfamily="Helvetica",fontcolor="black",fontface=2,fontsize.title=8,cex.bands=0.5)
+
+plotTracks(list(itrack,gtrack2,allTrack,strictTrack,summitTrack,summitpeakTrack,ucscGenes2,gtrack),from = 158626991,to = 158682822,main="hg19")
+
+pdf(file = "hg19-wdr60-gviz.pdf",width = 4,height = 5)
+plotTracks(list(itrack,gtrack2,allTrack,strictTrack,summitTrack,summitpeakTrack,ucscGenes2,gtrack),from = 158626991,to = 158682822,main="hg19",sizes = c(0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1),title.width = 1.5,cex.main = 1)
+dev.off()
+```

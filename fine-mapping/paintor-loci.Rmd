@@ -1,0 +1,78 @@
+---
+title: "paintor-subsetting"
+author: "Paul Hook"
+date: "4/26/2019"
+output: html_document
+---
+
+```{r, loading-packages}
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(reshape2)
+```
+
+```{r, reading-in-data}
+# loading
+results.path <- here::here("final.keep.id.clozuk_ld_join.txt")
+
+# cleaning
+mat <- read.delim2(results.path,
+                   sep = ' ',
+                   header = T,stringsAsFactors = F)
+```
+
+```{r, modifying data}
+mod.mat <- mat %>%
+  dplyr::mutate_at(-c(1,4:6,10:11,15,16), as.numeric) %>% 
+  dplyr::mutate(Zscore=log(or)/se,
+                `-log10(P)`=-log10(p))
+
+#https://huwenboshi.github.io/data%20management/2017/11/23/tips-for-formatting-gwas-summary-stats.html
+```
+
+```{r, writing out 0.6 snps}
+final.mat <- mod.mat %>%
+  dplyr::select(chr=chr.sum,pos=bp.sum,rsid=rsid.proxy,A1=a1,A2=a2,Zscore,id=id.sum,lead.snp,r.squared,logP) %>%
+  dplyr::mutate(A1=toupper(A1),A2=toupper(A2),chr=paste0("chr",chr)) %>%
+  dplyr::filter(r.squared >= 0.6) %>%
+  dplyr::mutate_if(is.character, str_replace_all, pattern = 'chr23', replacement = 'chrX') %>%
+  {.}
+
+final.mat[(duplicated(final.mat[,c(3,8)])),]
+final.mat[(duplicated(final.mat[,c(3,8)],fromLast = T)),] # none of the proxy SNPs are duplicated
+
+mat.sum <- final.mat %>%
+  dplyr::group_by(lead.snp) %>%
+  dplyr::summarise(snps=n())
+
+for (name in levels(as.factor(final.mat$lead.snp))){
+  #Subset the data by MP
+  tmp=subset(final.mat,lead.snp==name) %>% arrange(chr,pos)
+  #Create a new filename for each MP - the folder 'mpExpenses2012' should already exist
+  fn=paste('paintor.loci/',tmp$chr[1],'.',name,'.hdl',sep='')
+  #Save the CSV file containing separate expenses data for each MP
+  write.table(tmp,file=fn,quote = F,sep = " ",row.names=FALSE)
+}
+```
+
+```{r, writing out low ld}
+low.mat <- mod.mat %>%
+  dplyr::select(chr=chr.sum,pos=bp.sum,rsid=rsid.proxy,A1=a1,A2=a2,Zscore,id,lead.snp,r.squared,`-log10(P)`) %>%
+  dplyr::mutate(A1=toupper(A1),A2=toupper(A2),chr=paste0("chr",chr)) %>%
+  dplyr::mutate_if(is.character, str_replace_all, pattern = 'chr23', replacement = 'chrX') %>%
+  {.}
+
+# Checking to see if all proxy snp/lead snp pairs are unqiue
+low.mat[(duplicated(low.mat[,c(3,8)])),]
+low.mat[(duplicated(low.mat[,c(3,8)],fromLast = T)),]
+
+for (name in levels(as.factor(low.mat$lead.snp))){
+  #Subset the data by lead.snp and sort
+  tmp=subset(low.mat,lead.snp==name) %>% arrange(chr,pos)
+  #Create a new filename for each locus
+  fn=paste('paintor.loci/',tmp$chr[1],'.',name,'.hdl',sep='')
+  #Save the CSV file for each
+  write.table(tmp,file=fn,quote = F,sep = " ",row.names=FALSE)
+}
+```

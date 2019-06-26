@@ -1,0 +1,49 @@
+neurot
+
+# Meta-Analysis of Genome-wide Association Studies for Neuroticism in 449,484 Individuals Identifies Novel Genetic Loci and Pathways.
+
+wget https://ctg.cncr.nl/documents/p1651/sumstats_neuroticism_ctg_format.txt.gz
+wget https://ctg.cncr.nl/documents/p1651/readme_ctg
+wget https://ctg.cncr.nl/documents/p1651/checksums.txt
+
+md5sum --check checksums.txt > check.txt
+
+# The summary stats contain:
+
+SNP: rsID of the variant -> RSID
+A1: effect allele
+Z: z-score from the meta-analysis
+N_analyzed: per-SNP sample size -> N
+INFO: info score (SNP quality measure) -> INFO_UKB
+
+python ~/my-python-modules/ldsc/munge_sumstats.py --sumstats sumstats_neuroticism_ctg_format.txt.gz --out Neurot-Nagel --snp RSID --info INFO_UKB --ignore SNP
+
+## 01-30-19 ##
+- Realized that I did not filter SNPs by MAF, so I am going to redo munging
+
+./munge_sumstats.py \
+--out frq_Neurot-Nagel \
+--frq MAF_UKB \
+--snp RSID \
+--info INFO_UKB \
+--sumstats sumstats_neuroticism_ctg_format.txt.gz \
+--ignore SNP 
+
+Read 10958177 SNPs from --sumstats file.
+Removed 108858 SNPs with missing values.
+Removed 0 SNPs with INFO <= 0.9.
+Removed 3474696 SNPs with MAF <= 0.01.
+Removed 0 SNPs with out-of-bounds p-values.
+Removed 1111806 variants that were not SNPs or were strand-ambiguous.
+6262817 SNPs remain.
+Removed 174 SNPs with duplicated rs numbers (6262643 SNPs remain).
+Removed 1164 SNPs with N < 259758.666667 (6261479 SNPs remain).
+Median value of Z was -0.001, which seems sensible.
+Writing summary statistics for 6261479 SNPs (6261479 with nonmissing beta) to frq_Neurot-Nagel.sumstats.gz.
+
+Metadata:
+Mean chi^2 = 1.726
+Lambda GC = 1.513
+Max chi^2 = 134.697
+7085 Genome-wide significant SNPs (some may have been removed by filtering).
+

@@ -1,0 +1,359 @@
+---
+title: "2019_peak-correlation"
+author: "Paul Hook"
+date: "4/10/2019"
+output: html_document
+---
+
+First I need to read in the output from running featureCounts on the server side. The "counts" dataframe has a large first comment which is not necessary, so we will skip the first line. The "counts" data frame is large and contains annotation information (1:6) and count information (7:30). These will be split. Sample names are unweildy so they need to be rename in the most automated way possible. End up with final dataframes including "anno", "counts_named", "peak_summary."
+
+```{r load_libraries}
+library(here)
+library(tidyverse)
+library(ggdendro)
+library(ggbiplot)
+library(patchwork)
+library(cqn)
+library(sva)
+library(formattable)
+```
+
+```{r read_in_data}
+# Loading data
+count.path <- here::here("data","2019_peak-counts.txt")
+summary.path <- here::here("data","2019_peak-counts.txt.summary")
+
+count.df <- read.delim(file = count.path, header = T, skip = 1)
+summary.df <- read.delim(file = summary.path, header = T)
+
+#Split count dataframe
+anno <- count.df %>% dplyr::select(Geneid, Chr, Start, End, Strand, Length)
+counts <- count.df %>% dplyr::select(-Geneid, -Chr, -Start, -End, -Strand, -Length)
+
+#Renaming columns of count
+samples.bam <- sapply(strsplit(names(counts), "sorted_"), "[", 2)
+samples <- sapply(strsplit(samples.bam, ".bam"), "[", 1)
+counts_named <- counts
+names(counts_named) <- samples
+
+#Renaming columns of summary
+peak_summary <- summary.df
+names(peak_summary) <- c("Status", samples)
+```
+
+Creating a meta data dataframe for all of the samples. This information might be particularly important for trying to determine batch or other covariate effects seen in the data
+```{r Creating a pheno_df}
+pheno.dir <- here::here("data","peak-annot.txt")
+pheno.df <- read.delim(file = pheno.dir, header = T) %>%
+  dplyr::arrange(-desc(file.name)) %>%
+  mutate(color = case_when(cell.cat == "Glia" ~ "#4DAF4A",
+        cell.cat == "Excitatory neurons" ~ "#377EB8",
+        cell.cat == 'Inhibitory neurons' ~ "#984EA3",
+        cell.cat == 'Dopaminergic neurons' ~ "#E41A1C",
+        cell.cat == 'Retina cells' ~ "#FF7F00",
+        cell.cat == 'T-cells' ~ "#F781BF"))
+
+```
+
+I first wanted to look at the "raw data" density distributions so I could get a feel as to how to this data looks before normalization. First I copy the "counts_named" object so I do not accidentally modify the original data.
+```{r}
+Counts <- counts_named
+hist(t(log2(Counts+1)), main = "Histogram of log2 transformed counts")
+
+#Changing row names
+names(Counts) <- pheno.df$cell.population
+
+counts.log2 <- log2(Counts+1)
+
+log2.cors <- cor(counts.log2, method = "pearson")	
+log2.dd <- as.dist(1-abs(log2.cors))
+log2.hc <- hclust(log2.dd, method = "ward.D2")
+log2.dendro <- ggdendrogram(log2.hc,rotate = T) +
+  theme(axis.text.x = element_blank()) + geom_text(size=10)
+
+# Using hierarchial clustering in this way was suggested by http://research.stowers.org/mcm/efg/R/Visualization/cor-cluster/index.htm
+
+# https://cran.r-project.org/web/packages/ggdendro/vignettes/ggdendro.html
+# https://stackoverflow.com/questions/8045538/labelling-ggdendro-leaves-in-multiple-colors
+
+# Making dendrogram
+dend <- as.dendrogram(log2.hc)
+dend_data <- dendro_data(dend,type="rectangle")
+
+labs <- label(dend_data)
+labs <- labs %>%
+  dplyr::mutate(type = if_else(grepl("microglia|astrocytes|oligo|neun",label,ignore.case = T),"Glia",
+                               if_else(grepl("excitatory",label,ignore.case = T),"Excitatory neurons",
+                                       if_else(grepl("inhibitory",label,ignore.case = T),"Inhibitory neurons",
+                                              if_else(grepl("da",label,ignore.case = T),"Dopaminergic neurons",
+                                                      if_else(grepl("cone|rod",label,ignore.case = T),"Retina cells",
+                                                              if_else(grepl("T-cells",label,ignore.case = T),"T-cells","NA")))))))
+
+col <- c(Glia="#4DAF4A",
+         `Excitatory neurons`="#377EB8",
+         `Inhibitory neurons`="#984EA3",
+         `Dopaminergic neurons`="#E41A1C",
+         `Retina cells`="#FF7F00",
+         `T-cells`="#F781BF")
+
+log2.dendro <- ggplot(segment(dend_data)) +
+  geom_segment(aes(x=x, y=y, xend=xend, yend=yend),
+               size=0.75,lineend = "round",linejoin = "round") +
+  geom_text(data=label(dend_data),
+               aes(label=label,
+                   x=x, y=0,
+                   colour=labs$type,
+                   angle=45,hjust=1,vjust=1,
+                   family="Helvetica",fontface="bold"),
+            nudge_y = -0.02) +
+  theme_dendro() +
+  theme(legend.position="none") +
+  ylim(c(-1,1.25)) + xlim(c(-1,26)) +
+  scale_color_manual(name = "", values = col)
+
+
+pca.log2 <- prcomp(t(counts.log2), scale. = T)
+log2.out <- as.data.frame(pca.log2$x)
+summary(pca.log2)
+
+# Both are ordered by the file name so we can just column bind
+final.log2.out <- cbind(log2.out,pheno.df)
+
+p.log2.type <-ggplot(final.log2.out, aes(x=PC1,y=PC2,color=type))
+p.log2.type <- p.log2.type+geom_point(size=2) + theme_classic() +
+  ggtitle("Type of ATAC-seq") +
+  xlab("PC1 (70.29% variance explained)") +
+  ylab("PC2 (6.66% variance explained)") +
+  theme(axis.title = element_text(size=8),
+        axis.text = element_text(size=6),
+        legend.text = element_text(size=8),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  theme(legend.key.size = unit(0.5,"line"),legend.title = element_blank())
+
+p.log2.exp <-ggplot(final.log2.out, aes(x=PC1,y=PC2,color=experiment))
+p.log2.exp <- p.log2.exp+geom_point(size=2) + theme_classic() +
+  ggtitle("Experiment") + 
+  xlab("PC1 (70.29% variance explained)") +
+  ylab("PC2 (6.66% variance explained)") +
+  theme(axis.title = element_text(size=8),
+        axis.text = element_text(size=6),
+        axis.title.y = element_blank(),
+        legend.text = element_text(size=8),
+        plot.title = element_text(hjust = 0.5, face="bold")) +
+  theme(legend.key.size = unit(0.5,"line"), legend.title = element_blank())
+
+p.log2.cells <-ggplot(final.log2.out, aes(x=PC1,y=PC2,color=cell.cat))
+p.log2.cells <- p.log2.cells+geom_point(size=2) + theme_classic() +
+  ggtitle("Cell population") +
+  xlab("PC1 (70.29% variance explained)") +
+  ylab("PC2 (6.66% variance explained)") +
+  theme(axis.title = element_text(size=8),
+        axis.text = element_text(size=6),
+        legend.text = element_text(size=8),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  theme(legend.key.size = unit(0.5,"line"), legend.title = element_blank()) +
+  scale_color_manual(name = "", values = col)
+
+log2.summary <- log2.dendro / (p.log2.type + p.log2.exp + p.log2.cells)
+
+```
+
+# According to Sarah. there are a few steps in order to set up the data for CQN normalization. Step one is to calculate the sizeFactors which can be done from the "peak_summary" and this will be stored as "sizeFactor."
+```{r getting setup for CQN}
+# Calculating sizeFactor
+sizeFactor <- colSums(peak_summary[,-1])
+sizeFactor
+
+# Make Covariate file for CQN including GC content.
+# Loading GC-content file
+gc_dir <- here::here("data","2019_gc.bed")
+gc_content <- read.delim(gc_dir, header = TRUE)
+
+#updating anno file
+anno$GC <- gc_content$X6_pct_gc
+anno$Length <- gc_content$X13_seq_len
+
+#naming covariates
+Covariates <- data.frame(GeneID=anno$Geneid, length=anno$Length, gccontent=anno$GC)
+
+#setting up other CQN things
+sizes <- t(sizeFactor)
+
+#Performing quantile normalization with covariates using CQN
+normalizing <- cqn(counts = Counts, lengths = Covariates$length, x = Covariates$gccontent, sizeFactors = sizes, verbose = T)
+
+#Modifying the counts
+normalized.counts <- normalizing$y + normalizing$offset
+hist(normalized.counts, main = "CQN Normalized counts histogram")
+
+#Performing ComBat in order to remove "batch" data
+mod0 = model.matrix(~1,data=pheno.df)
+combat_data_type <- ComBat(dat=normalized.counts, batch = pheno.df$type, mod=mod0, par.prior = T, prior.plots = F)
+
+# Plotting combined count data
+hist(combat_data_type, main = "CQN/ComBat normalaized counts histogram")
+
+#Performing correlation to look at how correlated the samples are
+par(mfrow=c(1,1))
+combat.cors <- cor(combat_data_type, method = "pearson")	
+dd <- as.dist(1-abs(combat.cors))
+combat.hc <- hclust(dd, method = "ward.D2")
+combat.dendro <- ggdendrogram(combat.hc) + theme(axis.text.y = element_blank())
+
+dend <- as.dendrogram(combat.hc)
+dend_data <- dendro_data(dend,type="rectangle")
+
+labs <- label(dend_data)
+labs <- labs %>%
+  dplyr::mutate(type = if_else(grepl("microglia|astrocytes|oligo|neun",label,ignore.case = T),"Glia",
+                               if_else(grepl("excitatory",label,ignore.case = T),"Excitatory neurons",
+                                       if_else(grepl("inhibitory",label,ignore.case = T),"Inhibitory neurons",
+                                              if_else(grepl("da",label,ignore.case = T),"Dopaminergic neurons",
+                                                      if_else(grepl("cone|rod",label,ignore.case = T),"Retina cells",
+                                                              if_else(grepl("T-cells",label,ignore.case = T),"T-cells","NA")))))))
+
+col <- c(Glia="#4DAF4A",
+         `Excitatory neurons`="#377EB8",
+         `Inhibitory neurons`="#984EA3",
+         `Dopaminergic neurons`="#E41A1C",
+         `Retina cells`="#FF7F00",
+         `T-cells`="#F781BF")
+
+combat.dendro <- ggplot(segment(dend_data)) +
+  geom_segment(aes(x=x, y=y, xend=xend, yend=yend),
+               size=0.75,lineend = "round",linejoin = "round") +
+  geom_text(data=label(dend_data),
+               aes(label=label,
+                   x=x, y=0,
+                   colour=labs$type,
+                   angle=90,hjust=1.05,vjust=0.5,
+                   family="Helvetica",fontface="bold"),
+            nudge_y = -0.02,size=2.5) +
+  theme_dendro() +
+  theme(legend.position="none",
+        text = element_text(family = "Helvetica")) +
+  ylim(c(-1,2)) + xlim(c(-1,26)) +
+  scale_color_manual(name = "", values = col) +
+  theme(plot.margin = margin(0, -2, 0,-2, "cm"))
+  NULL
+
+#Performing PCA 
+pca.combat <- prcomp(t(combat_data_type), scale. = TRUE)
+combat.out <- as.data.frame(pca.combat$x)
+
+final.combat.out <- cbind(combat.out,pheno.df)
+
+#Getting the summary data from the PCA, especially performed the get the proportion of variance
+summary(pca.combat)
+
+#Plotting PC1 vs. PC2, colored by type of experiment
+#Plotting
+p.combat.type <-ggplot(final.combat.out, aes(x=PC1,y=PC2,color=type))
+p.combat.type<- p.combat.type+geom_point(size=2) + theme_classic() +
+  #ggtitle("Type of ATAC-seq") +
+  xlab("PC1 (19.73% variance explained)") +
+  ylab("PC2 (11.8% variance explained)") +
+  theme(axis.title = element_text(size=8),
+        axis.text = element_text(size=6),
+        legend.text = element_text(size=8),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  theme(legend.key.size = unit(0.5,"line"),legend.title = element_blank())
+
+
+p.combat.exp <-ggplot(final.combat.out, aes(x=PC1,y=PC2,color=experiment))
+p.combat.exp<- p.combat.exp+geom_point(size=2) + theme_classic() +
+  #ggtitle("Experiment") + 
+  xlab("PC1 (19.73% variance explained)") +
+  #ylab("PC2 (11.8% variance explained)") +
+  theme(axis.title = element_text(size=8),
+        axis.title.y = element_blank(),
+        axis.text = element_text(size=6),
+        legend.text = element_text(size=8),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  theme(legend.key.size = unit(0.5,"line"),legend.title = element_blank())
+
+
+p.combat.cells <-ggplot(final.combat.out, aes(x=PC1,y=PC2,color=cell.cat))
+p.combat.cells<- p.combat.cells+geom_point(size=2) + theme_classic() +
+  #ggtitle("Cell population") +
+  xlab("PC1 (19.73% variance explained)") +
+  #ylab("PC2 (11.8% variance explained)") +
+  theme(axis.title = element_text(size=8),
+        axis.title.y = element_blank(),
+        axis.text = element_text(size=6),
+        legend.text = element_text(size=8),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  theme(legend.key.size = unit(0.5,"line"),legend.title = element_blank()) +
+  scale_color_manual(name = "", values = col)
+  
+combat.summary <- p.combat.type + p.combat.exp + p.combat.cells
+
+combat.dendro + p.combat.cells
+
+ggsave(combat.dendro,
+       filename = here::here("Paper","results_1","2019-04-10_combat-dendrogram.png"),
+       width = 10, height=5,dpi = "print")
+
+ggsave(p.combat.cells,
+       filename = here::here("Paper","results_1","2019-04-10_combat-PCA.png"),
+       width = 6, height=5,dpi = "print")
+```
+
+```{r}
+scree.combat <- ggscreeplot(pca.combat, type = "pev") +
+  ggtitle('Screeplot') + theme_classic() +
+  theme(axis.title = element_text(size=8),
+        plot.title = element_text(hjust = 0.5, face = "bold"))
+```
+
+```{r}
+library(tsne)
+
+nComponents <- 6
+seed <- 1834
+set.seed(seed) #setting seed
+
+combat.tsne<-tsne(pca.combat$x[,1:nComponents],perplexity=5,max_iter=10000,whiten = T)
+
+pheno.df$tsne1 <- combat.tsne[,1]
+pheno.df$tsne2 <- combat.tsne[,2]
+
+col <- c(Glia="#4DAF4A",
+         `Excitatory neurons`="#377EB8",
+         `Inhibitory neurons`="#984EA3",
+         `Dopaminergic neurons`="#E41A1C",
+         `Retina cells`="#FF7F00",
+         `T-cells`="#F781BF")
+
+tsne.cat <-ggplot(pheno.df, aes(x=tsne1,y=tsne2,color=cell.cat,label=cell.population)) +
+  geom_point(size=3) + theme_classic() +
+  xlab("t-SNE 1") + ylab("t-SNE 2") +
+  theme(axis.text = element_blank(), 
+        axis.ticks = element_blank(),
+        legend.position = "right",
+        axis.title = element_text(face="bold",family = "Helvetica"),
+        legend.text=element_text(size=8),
+        legend.text.align = 0,
+        legend.key.height = unit(0.5,'cm'),
+        legend.title = element_text(size=10),
+        legend.title.align = 0) +
+  scale_color_manual(name="Broad Cell Population", values = col)
+
+final.tsne.cat <- tsne.cat + theme(plot.margin = margin(0.5, 3, 0.5, 3, "cm"))
+
+fig1a <- combat.dendro + final.tsne.cat
+pdf(file = "Figure1A_dendro-tsne.pdf",height = 4, width = 8)
+fig1a
+dev.off()
+```
+
+# Make figure S1
+```{r}
+pca.summaries <- (p.log2.type + p.log2.exp + p.log2.cells) / (p.combat.type + p.combat.exp + p.combat.cells)
+
+pdf(file = "Figure.S1_pca.pdf",height =4,width =10)
+pca.summaries
+dev.off()
+```
+

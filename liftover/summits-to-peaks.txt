@@ -1,0 +1,13 @@
+## These are the set of commands used to convert lifted over summits to hg19 peaks that eventually will get used for LDSC heritability analysis and fine-mapping.
+
+## Adding +/- 250. This for loop prints column 1 (chr), subtracts 250 bp from column 2 (start), and adds 250 bp to column 3 (end). The resulting BED file is then sorted based on the first two columns.
+for i in `ls -v hg19_filter2*`; do cat $i | awk 'BEGIN {FS="\t";OFS="\t"} {print $1,$2-250,$3+250}' | sort -k1,1 -k2,2n > mod_${i}; done
+
+## Peaks within each cell population are sorted again (just to make sure) and are merged using BEDtools
+for i in `ls -v mod*`; do sort -k1,1 -k2,2n $i | bedtools merge -i - > merged_${i}; done
+
+## Making a "final" directory to put the peak files in, if it does not already exist
+mkdir -p final
+
+## Cleaning for high signal regions. Use BEDtools intersect in order to return peaks that have no overlap with the ENCODE blacklisted regions. Option '-v' allows us to do this.
+for i in `ls -v merged*`; do cat $i | sort -k1,1 -k2,2n | bedtools intersect -sorted -a - -b ~/data/PWH/public_atac_data/atac-data/liftover/hg19/hg19_blacklist/hg19_merged_ENCODE-JDB_blacklist.bed -v > final/cleaned_${i}; done

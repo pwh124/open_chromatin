@@ -1,0 +1,12 @@
+## Modifying and combining LDSC results
+
+## Modifying all the LDSC results so they can be combined. This basically consists of removing the header
+
+for i in *.cell_type_results.txt; do awk '{print $0"\t"FILENAME}' $i | tail -n +2 > modified/${i%.cell_type_results.txt}.txt; done
+
+## Re-creating the header needed for these results
+
+cat ../2019_PASS_Ulcerative_Colitis.sumstats_Hook_ATAC.cell_type_results.txt | awk 'NR==1 {print $0"\t""GWAS"}' > header.txt
+
+## Combining them everything together
+cat header.txt 2019* > 2019_Hook-LDSC_results.txt

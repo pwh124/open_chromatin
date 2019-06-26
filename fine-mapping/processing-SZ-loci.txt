@@ -1,0 +1,24 @@
+## In order to run PAINTOR, "loci" containing a set of SNPs and their summary statistics need to be created. In order to put this information together, lead SNPs and all SNPs in LD (R2 >= 0.1) need to be extracted. This was done through the R with the 'proxysnps' package in the script entitled 'proxy-snps.Rmd' which created a file with the suffix '.proxy-snps.new.txt' for 177 loci.
+
+## Combine and sort all loci
+cat *.proxy-snps.new.txt | sort -k1,1 -k2,2n  > sorted.Pardinas_proxy-snps.txt
+
+## Only keep SNPs with official RS number (only 55)
+awk '$3 ~ /rs/' sorted.Pardinas_proxy-snps.txt > rs.sorted.Pardinas_proxy-snps.txt
+
+## For some reason, the CLOZUK sumstats use 'Chr23' instead of 'ChrX' so the proxy SNPs need to be modified for joining. We add an 'ID' column to match the ID column in the summary statistics. We sort based on the ID.
+sed 's/X/23/g' rs.sorted.Pardinas_proxy-snps.txt  | awk 'BEGIN { FS = "\t";OFS="\t" };{print $3":"$2":"$4":"$5,$0}' | sort -k1b,1 > mod.rs.sorted.Pardinas_proxy-snps.txt
+
+## CLOZUK summary statistics are processed for joining. The header is removed. Only SNPs with an official RS number are retained. The SNPs are sorted by ID.
+gunzip -c clozuk_pgc2.meta.sumstats.txt.gz | tail -n +2 | awk '$1 ~ /rs/' | sort -k1b,1 > mod.sorted_all.clozuk.sumstats.txt
+
+## Summary statistics and proxy SNPs are joined based on the first column.
+join -a1 -j1 mod.rs.sorted.Pardinas_proxy-snps.txt mod.sorted_all.clozuk.sumstats.txt > id.clozuk_ld_join.txt
+
+## Only rows in which there is a 12th column are retained. These are all the SNPs that actually had matches.
+awk '$12' id.clozuk_ld_join.txt > keep.id.clozuk_ld_join.txt
+
+## Header is added back on to the final file.
+echo "id chr.proxy bp.proxy rsid.proxy ref alt maf r.squared d.prime chosen lead.snp freq.a1 chr.sum bp.sum a1 a2 or se p" | cat - keep.case.clozuk_ld_join.txt > final.keep.case.clozuk_ld_join.txt 
+
+## Loci were then partitioned with the R script, 'paintor-loci.Rmd'

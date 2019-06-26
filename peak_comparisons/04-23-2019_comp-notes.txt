@@ -1,0 +1,15 @@
+## April 23, 2019 ##
+
+As I am writing the methods section of the paper, I realized that it might be helpful to combine the Roadmap and BOCA data and do the same overlap.
+
+cp boca_atac/boca_processed/merged_boca_neurons.bed .
+cp roadmap_dnase/processed_dnase/merged_roadmap_imputed_DNase.bed .
+cat merged_* | sort -k1,1 -k2,2n > sorted_roadmap_boca.bed
+bedtools merge -i sorted_roadmap_boca.bed > merged_roadmap_boca.bed
+
+# Commands added on to overlaps.sh
+combined=/Volumes/PAULHOOK/2019_open-chromatin/human_chromatin/merged_roadmap_boca.bed
+mkdir combined_overlap
+for i in `ls -v *.bed`; do bedtools jaccard -a $i -b $combined | awk 'NR >1' | cut -f4 > combined_overlap/combined_${i}; done
+grep "" combined/*bed > final_combined_overlap.txt
+grep "" combined_overlap/*bed > final_combined_overlap.txt

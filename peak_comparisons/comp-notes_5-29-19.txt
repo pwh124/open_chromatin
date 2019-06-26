@@ -1,0 +1,16 @@
+## May 29, 2019 ##
+
+# Re-preforming T-cell overlaps
+
+# First creating a merged T-cell ATAC/roadmap dataset
+
+cat cd8.naive_dnase.roadmap.bed cd8.memory_dnase.roadmap.bed final_CD8-summits_corces_hg19_summits.bed | awk 'BEGIN{FS="\t";OFS="\t"}{print $1,$2,$3}' | sort -k1,1 -k2,2n | bedtools merge -i - > merged_cd8_atac.roadmap.bed
+
+cat cd4.naive_dnase.roadmap.bed cd4.memory_dnase.roadmap.bed final_CD4-summits_corces_hg19_summits.bed | awk 'BEGIN{FS="\t";OFS="\t"}{print $1,$2,$3}' | sort -k1,1 -k2,2n | bedtools merge -i - > merged_cd4_atac.roadmap.bed
+
+# Merging CD4 ATAC with all roadmap
+
+cat final_CD4-summits_corces_hg19_summits.bed merged_roadmap_imputed_DNase.bed | awk 'BEGIN{FS="\t";OFS="\t"}{print $1,$2,$3}' | sort -k1,1 -k2,2n | bedtools merge -i - > all.roadmap_cd4_atac.bed
+
+cat final_CD8-summits_corces_hg19_summits.bed merged_roadmap_imputed_DNase.bed | awk 'BEGIN{FS="\t";OFS="\t"}{print $1,$2,$3}' | sort -k1,1 -k2,2n | bedtools merge -i - > all.roadmap_cd8_atac.bed
+
