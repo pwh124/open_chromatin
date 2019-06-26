@@ -6,6 +6,10 @@ https://www.biorxiv.org/content/early/2018/09/26/427484
 
 This repsitory will be continuously updated.
 
+## 06-26-19
+
+Added a bunch of code including code using in ATAC-seq alignment and peak calling (align_peak-calling), linkage disequilibrium score regression (ldsc), liftOver (liftover), comparison of peaks (peak_comparisons), read extraction from single-cell data (sc_read_extraction), and fine-mapping of SZ loci using PAINTOR (fine-mapping).
+
 ## 06-14-2019
 
 As will surely be obvious, this repo was not continuously updated!
