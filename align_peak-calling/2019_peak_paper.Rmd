@@ -338,12 +338,19 @@ tsne.cat <-ggplot(pheno.df, aes(x=tsne1,y=tsne2,color=cell.cat,label=cell.popula
         legend.key.height = unit(0.5,'cm'),
         legend.title = element_text(size=10),
         legend.title.align = 0) +
-  scale_color_manual(name="Broad Cell Population", values = col)
+  scale_color_manual(name="Broad Cell Population", values = col) +
+  geom_text_repel(data=subset(pheno.df, cell.population == "Inhibitory*" | cell.population == "Inhibitory MSN*"),
+            aes(tsne1,tsne2,label=cell.population),family="Helvetica",size=2.5,hjust=0,vjust=0,seed = 24)
 
 final.tsne.cat <- tsne.cat + theme(plot.margin = margin(0.5, 3, 0.5, 3, "cm"))
 
 fig1a <- combat.dendro + final.tsne.cat
-pdf(file = "Figure1A_dendro-tsne.pdf",height = 4, width = 8)
+
+#pdf(file = "Figure1A_dendro-tsne.pdf",height = 4, width = 8)
+#fig1a
+#dev.off()
+
+pdf(file = "Figure1A_dendro-tsne_V2.pdf",height = 4, width = 8)
 fig1a
 dev.off()
 ```
