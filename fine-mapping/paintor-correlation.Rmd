@@ -1,0 +1,30 @@
+---
+title: "paintor-correlation"
+author: "Paul Hook"
+date: "2/27/2019"
+output: html_document
+---
+
+```{r, loading-packages}
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(reshape2)
+```
+
+```{r, reading-in-data}
+# loading
+ann.path <- here::here("final.all.overlap.txt")
+
+# cleaning
+mat <- read.delim2(ann.path,
+                   sep = ' ',
+                   header = T) %>%
+  dplyr::select(Excitatory_Layer_VI_sc,Excitatory_DG_sc,Excitatory_Layer_V,Excitatory_Layers_II.V_sc,Excitatory_Layer_VI,Excitatory_Layer_IV,Inhibitory_sc,Inhibitory_MSN_sc,Inhibitory_Gad2,Excitatory_Layers_II.III,Astrocytes_sc,Excitatory_Camk2a,Inhibitory_PV)
+
+test <- cor(mat,method = "pearson")
+
+library(corrplot)
+corrplot(test, method = "number",order = 'hclust',hclust.method = 'ward.D2', tl.cex = 0.5, cl.lim = c(0,1), is.corr = F)
+corrplot.mixed(test, lower.col = "black", number.cex=0.7,tl.cex = 0.5,cl.lim = c(0,1))
+```
