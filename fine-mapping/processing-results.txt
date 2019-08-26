@@ -1,0 +1,32 @@
+# Processing the binary annotation matrix
+mkdir variant_overlap
+cd paintor_files
+for i in `ls -v out_*.annotation | cut -d "." -f1-3`; do paste -d ' ' $i ${i}.annotation > ../variant_overlap/${i}_overlap.txt; done
+cd ../variant_overlap
+mkdir mod
+for i in `ls -v *overlap.txt`; do tail -n +2 $i > mod/mod_${i}; done
+cd mod
+cat *overlap.txt > all.overlap.txt
+head -1 ../out_chrX.rs12009217.processed_overlap.txt | cat - all.overlap.txt > final.all.overlap.txt
+
+# Processing the null results
+cd null_mcmc
+mkdir mod
+for i in `ls -v *processed*`; do tail -n +2 $i > mod/mod_${i}; done
+cd mod
+cat * > all.null.results.txt
+head -1 ../out_chrX.rs12009217.processed.null.mcmc.results | cat - all.null.results.txt > final.all.null.results.txt
+
+# Processing the annotation results
+cd anno_mcmc
+mkdir mod
+ for i in `ls -v *processed*`; do tail -n +2 $i > mod/mod_${i}; done
+cd mod
+cat * > all.anno.results.txt
+head -1 ../out_chrX.rs12009217.processed.anno.mcmc.results | cat - all.anno.results.txt > final.all.anno.results.txt 
+
+# Putting everything in a nice results directory
+mkdir results
+cp variant_overlap/mod/final.all.overlap.txt results/
+cp anno_mcmc/mod/final.all.anno.results.txt results/
+cp null_mcmc/mod/final.all.null.results.txt results/
