@@ -35,7 +35,7 @@ $PAINTDIR/PAINTOR -input input.files \
 -RESname merged.results \
 -ANname annotation \
 -set_seed 3 \
--gamma_initial 3.6,-0.99 \
--MI 3
+-gamma_initial 3.79521,-0.939523 \
+-MI 1
 
 exit 0

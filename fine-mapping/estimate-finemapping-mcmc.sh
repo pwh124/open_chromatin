@@ -35,6 +35,6 @@ $PAINTDIR/PAINTOR -input input.files \
 -RESname merged.estimate \
 -ANname annotation \
 -set_seed 3 \
--MI 20
+-MI 30
 
 exit 0

@@ -34,6 +34,6 @@ $PAINTDIR/PAINTOR -input input.files \
 -RESname esitmate.null.mcmc.results \
 -ANname annotation \
 -set_seed 3 \
--MI 20
+-MI 30
 
 exit 0

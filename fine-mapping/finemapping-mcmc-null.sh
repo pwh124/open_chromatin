@@ -34,7 +34,7 @@ $PAINTDIR/PAINTOR -input input.files \
 -RESname null.mcmc.results \
 -ANname annotation \
 -set_seed 3 \
--gamma_initial 3.6 \
--MI 3
+-gamma_initial 3.79521 \
+-MI 1
 
 exit 0
