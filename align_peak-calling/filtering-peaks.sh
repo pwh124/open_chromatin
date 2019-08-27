@@ -1,4 +1,4 @@
-## Scoring and filtering summits according to what was laid out in TCGA ATAC-seq paper which normalizes peakScore for sequencing depth. We wanted to do this so that peaks that meet the same level of evidence in each cell population would be used.
+:## Scoring and filtering summits according to what was laid out in TCGA ATAC-seq paper which normalizes peakScore for sequencing depth. We wanted to do this so that peaks that meet the same level of evidence in each cell population would be used.
 
 ## Starting with summit beds from MACS2 that are arranged as follows
 ## chr	start	end	peak_name	peakScore

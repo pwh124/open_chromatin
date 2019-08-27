@@ -17,7 +17,7 @@ DIR=$HOME/data/PWH/public_atac_data/atac-data/ldsc/
 ANNOT_DIR=$HOME/data/PWH/public_atac_data/atac-data/ldsc/roadmap_control
 
 ## Setting prefix for all the files
-prefix="Roadmap.control"
+prefix="Roadmap.control" # Or whatever prefix is appropriate for the files.
 
 ## Loading LDSC and activating the python environment
 module load python/2.7-anaconda

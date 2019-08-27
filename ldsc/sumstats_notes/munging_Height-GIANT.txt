@@ -9,10 +9,4 @@ wget https://portals.broadinstitute.org/collaboration/giant/images/0/01/GIANT_HE
 
 # It does not have an INFO column so I will merge with the snplist that Bulik suggests (https://github.com/bulik/ldsc/wiki/Heritability-and-Genetic-Correlation)
 
-~/my-python-modules/ldsc/munge_sumstats.py --sumstats GIANT_HEIGHT_Wood_et_al_2014_publicrelease_HapMapCeuFreq.txt.gz --merge-alleles ../../w_hm3.snplist  --out Height-GIANT
-
-## 01-30-19 ##
-
-I realized I didn’t use the allele frequencies to filter
-
 python ~/my-python-modules/ldsc/munge_sumstats.py --sumstats GIANT_HEIGHT_Wood_et_al_2014_publicrelease_HapMapCeuFreq.txt.gz --merge-alleles ../../w_hm3.snplist --out frq_Height-GIANT --frq Freq.Allele1.HapMapCEU

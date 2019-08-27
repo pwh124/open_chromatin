@@ -112,56 +112,6 @@ write_tsv(dup.10,path = "Table.S12_duplicated-snps-high-pip.txt")
 ```
 
 ```{r}
-# subset rs4144797 locus
-locus <- overlap.df %>%
-  dplyr::filter(lead.snp == "rs4144797") %>% as_tibble()
-
-plot1 <- ggplot() +
-  geom_point(data = locus, aes(x = pos, y = r.squared), size = 2) +
-  theme_classic(base_size = 16) +
-  labs(x = "", y = bquote("R"^2)) +
-  scale_y_continuous(limits = c(0,1)) +
-  theme(axis.text.x = element_blank()) +
-  scale_x_continuous(limits = c(min(locus$pos)-2000, max(locus$pos) + 2000))
-
-plot2 <- ggplot() +
-  geom_point(data = locus, aes(x = pos, y =`-log10(P)`), size = 2) +
-  theme_classic(base_size = 16) +
-  labs(x = "", y = bquote("-log10(P-values)")) +
-  #scale_y_continuous(limits = c(0,1))
-  theme(axis.text.x = element_blank()) +
-  scale_x_continuous(limits = c(min(locus$pos)-2000, max(locus$pos) + 2000)) +
-  #geom_text_repel(aes(pos, logP, label = rsid), data = locus[locus$rsid %in% #c("rs181813160","rs4144797"),],point.padding = 0.1,nudge_x = 0.5) +
-  NULL
-
-plot3 <- ggplot() +
-  geom_point(data = locus, aes(x = pos, y = PIP_anno), size = 2) +
-  theme_classic(base_size = 16) +
-  labs(x = "Chr. 2 position", y = bquote("Finemapping PIP")) +
-  scale_y_continuous(limits = c(0,1.1)) +
-  geom_hline(yintercept = 0.1) +
-  scale_x_continuous(limits = c(min(locus$pos)-2000, max(locus$pos) + 2000)) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  geom_text(aes(pos, PIP_null, label = rsid), data = locus[locus$rsid %in% c("rs181813160","rs4144797"),],nudge_y = 0.18)
-
-total.plot <- plot1/plot2/plot3
-ggsave(filename = "ngef.png",plot = total.plot,width = 6,height = 10)
-
-
-```
-
-```{r}
-#Making a table for Mike Beer
-beer.table <- locus %>%
-  dplyr::select(chr,pos,id,rsid) %>%
-  dplyr::mutate(svm=if_else(rsid == "rs181813160",true = "yes",false = "no"),
-                genome="hg19") %>%
-  dplyr::select(chr,pos,genome,id,rsid,svm)
-
-write.table(beer.table, here::here("mike.beer","rs4144797_locus.txt"),quote = FALSE,sep = "\t",row.names = FALSE)
-```
-
-```{r}
 # Chunking out only the subset of variants with >= 0.1 and overlap wtih enriched cells
 subset <- overlap.df %>%
   dplyr::filter((PIP_null >= 0.1 | PIP_anno >= 0.1) & merged.anno.bed == 1) %>%
@@ -202,7 +152,7 @@ table <- subset.table %>%
   dplyr::mutate(`Cell Populations`=str_replace_all(`Cell Populations`,"CD4 T-cells mouse","CD4 T-cells")) %>%
   dplyr::mutate(`Cell Populations`=str_replace_all(`Cell Populations`,"CD8 T-cells mouse","CD8 T-cells"))
 
-# Now just subset it out for NGEF, PDE4, CACNA1C
+# Now just subset it out for NGEF, GABBR2, CACNA1C
 paper.loci <- table %>%
   dplyr::filter(`Lead SNP` == "rs4144797" | `Lead SNP` == "rs12129719" | `Lead SNP` == "rs2007044") %>%
   dplyr::arrange(`Lead SNP`,desc(`PIP with annotation`))
