@@ -1,4 +1,4 @@
-###Data for this directory can be downloaded from Zenodo:
+####Data for this directory can be downloaded from Zenodo:
 
 - *alignment.sh*: Script used to align ATAC-seq data to the mm10 genome. Includes filtering of reads aligned to the mitochondrial genome as well as "unknown" chromosomes and "random" chromosomes. Also removes duplicate reads and improperly paired reads.
 
