@@ -1,0 +1,4 @@
+cp boca_atac/boca_processed/merged_boca_neurons.bed .
+cp roadmap_dnase/processed_dnase/merged_roadmap_imputed_DNase.bed .
+cat merged_* | sort -k1,1 -k2,2n > sorted_roadmap_boca.bed
+bedtools merge -i sorted_roadmap_boca.bed > merged_roadmap_boca.bed

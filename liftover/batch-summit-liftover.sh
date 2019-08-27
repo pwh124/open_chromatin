@@ -18,7 +18,7 @@ cd $BED_PATH
 ## Run a for loop on the summit BEDs in order to batch submit them for liftover
 for i in `ls -v filter2*bed`
 do
-sbatch summit_liftover.sh $i
+sbatch liftover_summit.sh $i
 done
 
 exit 0
