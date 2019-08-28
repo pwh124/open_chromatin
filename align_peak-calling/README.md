@@ -14,10 +14,10 @@
 
 - `comparing-mouse-peaks.txt`: Contains code used in a Linux environment to process files. Filtered summits (created from the script above) were made into peaks (+/- 250 bp on each side) and sorted. Peaks were merged within each cell population with BEDtools and the sizes of merged peaks were calculated. Peaks overlapping with mouse ENCODE blacklisted regions were removed with BEDtools. All peaks from all cell populations were then merged with BEDtools to create a master peak set and a formated .SAF file was created for _featureCounts_. GC content for the peaks was then calculated using BEDtools 'nuc' command.
 	- Input: filter2*summits.bed (Zenodo: `filter2_summits_mm10.tar.gz`)
-	- Output: filter2*peaks.bed, .SAF, `2019_gc.bed` (Zenodo: `filter2_peaks_mm10.tar.gz`, `mm10-peaks-counts.tar.gz`)
+	- Output: filter2*peaks.bed, `filter2_merged-peaks-mm10.SAF`, `2019_gc.bed` (Zenodo: `filter2_peaks_mm10.tar.gz`, `mm10-peaks-counts.tar.gz`)
 
 - `featureCounts.sh`: Script used to create the ATAC-seq peak count matrix. It makes use of the _featureCounts_ program from the Subread software package.  Inputs are .SAF peak file and aligned .BAMs. Outputs are count matrix and count summary matrix.
-	- Input: BAM files, .SAF file
+	- Input: BAM files, `filter2_merged-peaks-mm10.SAF`
 	- Output: `2019_peak-counts.txt` (Zenodo: `mm10-peaks-counts.tar.gz`)
 
 - `2019_peak_paper.Rmd`: This script analyzes the union peak count matrix created from the peaks called from mm10 ATAC-seq alignment for the 25 mouse cell populations analyzed. The inputs are a count matrix ("2019_peak-counts.txt") and count summary file ("2019_peak-counts.txt.summary") as output by the Subread _featureCount_ program as well as a the GC content of each peak ("2019_gc.bed"). Normalization is performed followed by correlation analysis, principal component analysis, and visualization with t-SNE. Creates "Figure.S1_pca.pdf" and "Figure1A_dendro-tsne_V2.pdf" for the manuscript.

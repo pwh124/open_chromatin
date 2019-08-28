@@ -10,6 +10,7 @@ awk '$3 ~ /rs/' sorted.Pardinas_proxy-snps.txt > rs.sorted.Pardinas_proxy-snps.t
 sed 's/X/23/g' rs.sorted.Pardinas_proxy-snps.txt  | awk 'BEGIN { FS = "\t";OFS="\t" };{print $3":"$2":"$4":"$5,$0}' | sort -k1b,1 > mod.rs.sorted.Pardinas_proxy-snps.txt
 
 ## CLOZUK summary statistics are processed for joining. The header is removed. Only SNPs with an official RS number are retained. The SNPs are sorted by ID.
+## Obtained from https://walters.psycm.cf.ac.uk/clozuk_pgc2.meta.sumstats.txt.gz
 gunzip -c clozuk_pgc2.meta.sumstats.txt.gz | tail -n +2 | awk '$1 ~ /rs/' | sort -k1b,1 > mod.sorted_all.clozuk.sumstats.txt
 
 ## Summary statistics and proxy SNPs are joined based on the first column.
@@ -19,6 +20,6 @@ join -a1 -j1 mod.rs.sorted.Pardinas_proxy-snps.txt mod.sorted_all.clozuk.sumstat
 awk '$12' id.clozuk_ld_join.txt > keep.id.clozuk_ld_join.txt
 
 ## Header is added back on to the final file.
-echo "id chr.proxy bp.proxy rsid.proxy ref alt maf r.squared d.prime chosen lead.snp freq.a1 chr.sum bp.sum a1 a2 or se p" | cat - keep.case.clozuk_ld_join.txt > final.keep.case.clozuk_ld_join.txt 
+echo "id chr.proxy bp.proxy rsid.proxy ref alt maf r.squared d.prime chosen lead.snp freq.a1 chr.sum bp.sum a1 a2 or se p" | cat - keep.id.clozuk_ld_join.txt > final.keep.id.clozuk_ld_join.txt 
 
 ## Loci were then partitioned with the R script, 'paintor-loci.Rmd'

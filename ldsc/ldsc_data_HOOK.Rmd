@@ -15,7 +15,6 @@ library(tidyverse)
 
 dat <- here("data","2019_Hook-LDSC_results.txt")
 gwas.names <- here("data","2019_LDSC_phenotypes.txt")
-peaks <- here("filter2_peak-counts.txt")
 
 #load data
 ldsc.atac <- read.delim(dat,header = T ,sep = "\t")
@@ -47,26 +46,6 @@ final.ldsc.final <- ldsc.final %>%
 
 levels(final.ldsc.final$cell.pop)
 levels(final.ldsc.final$pheno)
-```
-
-# This will hopefully convince people that the correlation between number of peaks and LDSC result is random and does not really mean anything.
-```{r peak-count correlations}
-peak.cor <- final.ldsc.final %>%
-  group_by(pheno) %>%
-  summarise(cor = cor(peak.count,p.log10,method = "spearman")) %>%
-  mutate(mycolor= ifelse(cor>0, "blue","red"))
-
-pheno.cor <- ggplot(peak.cor, aes(reorder(pheno,-cor),cor)) +
-  geom_col(aes(fill=mycolor)) +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1,color="black",vjust = 0.5),
-        axis.title.x = element_blank(),
-        plot.title = element_text(hjust = 0.5)) +
-  guides(fill=F) + 
-  ggtitle("Spearman correlation between number of peaks and -log10(P-values) for all traits studied") +
-  ylab("Spearman rho")
-
-ggsave("2019-02-04_pheno-cor.tiff",plot = pheno.cor, dpi="retina",width = 12, height =6)
 ```
 
 # This will be used to show that LDSC results are pretty much what we would expect.
@@ -128,37 +107,6 @@ cor.matrix.co <- as.matrix(cor.dat.names.co)
 
 # This will show that our LDSC results from mouse data lifted over to human data give us roughly what we would expect from human results processed the same way.
 ```{r tcell_correlation}
-cd8.cor <- cor.test(cor.dat.names$`CD8 T-cells`,cor.dat.names$`CD8 T-cells human`, method = "spearman", conf.level = 0.95)
-scatter_plot <- ggplot(cor.dat.names, aes(`CD8 T-cells`, `CD8 T-cells human`))
-cd8.plot <- scatter_plot +
-  geom_vline(xintercept = 4.538574,color="grey40",linetype=2) + 
-  geom_hline(yintercept = 4.538574,color="grey40",linetype=2) +
-  geom_point(size=2) +
-  labs(x = "mouse-to-human CD8, -log10(P-values)", y = "human CD8, -log10(P-values)") +
-  geom_smooth(method="lm") + theme_classic() +
-  ggtitle("CD8 T-cells") +
-  annotate("text",x=1.5,y=7,label=paste("Spearman's rho\n",round(cd8.cor$estimate[[1]],4))) +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  ylim(-0.5,10) + xlim(0,10)
-
-cd4.cor <- cor.test(cor.dat.names$`CD4 T-cells`,cor.dat.names$`CD4 T-cells human`, method = "spearman", conf.level = 0.95)
-scatter_plot <- ggplot(cor.dat.names, aes(`CD4 T-cells`, `CD4 T-cells human`))
-cd4.plot <- scatter_plot +
-  geom_vline(xintercept = 4.538574,color="grey40",linetype=2) + 
-  geom_hline(yintercept = 4.538574,color="grey40",linetype=2) +
-  geom_point(size=2) +
-  labs(x = "mouse-to-human CD4, -log10(P-values)", y = "human CD4, -log10(P-values)") +
-  geom_smooth(method="lm") + theme_classic() +
-  ggtitle("CD4 T-cells") +
-  annotate("text",x=1.5,y=7,label=paste("Spearman's rho\n",round(cd4.cor$estimate[[1]],4))) +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  ylim(-0.5,10) + xlim(0,10)
-
-library(patchwork)
-cd.plot <- cd4.plot + cd8.plot
-
-ggsave("2019-02-04_cd4-cor.tiff",plot = cd.plot, dpi="retina",width = 10, height = 4)
-
 # Do this based on coefficient
 cd8.cor.co <- cor.test(cor.dat.names.co$`CD8 T-cells`,cor.dat.names.co$`CD8 T-cells human`, method = "spearman", conf.level = 0.95)
 scatter_plot <- ggplot(cor.dat.names.co, aes(`CD8 T-cells`, `CD8 T-cells human`))

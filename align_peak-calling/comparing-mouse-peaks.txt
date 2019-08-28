@@ -24,14 +24,14 @@ rename "cleaned_size_merged_mod_" "" *
 
 # Creating a master peak set
 
-cat filter2* | sort -k1,1 -k2,2n | bedtools merge -i - > filter2_merged-peaks.bed
+cat filter2* | sort -k1,1 -k2,2n | bedtools merge -i - > filter2_merged-peaks-mm10.bed
 
 # Format the master peak file like a .SAF file for the SubRead program to use
 
 awk '{print $1,$2,$3}' filter2_merged-peaks.bed | awk '$4=(FS"peak_"FNR)' | awk '$5=(FS"+")' | awk -v OFS='\t' '{print $4,$1,$2,$3,$5}' > tmp.filter_merged-peaks.bed
 
 # Adding correct file header needed 
-echo -e "GeneID\tChr\tStart\tEnd\tStrand" | cat - tmp.filter_merged-peaks.bed > filter2_merged-peaks.SAF
+echo -e "GeneID\tChr\tStart\tEnd\tStrand" | cat - tmp.filter_merged-peaks.bed > filter2_merged-peaks-mm10.SAF
 
 # Removing temporary files
 rm tmp.filter_merged-peaks.bed 
