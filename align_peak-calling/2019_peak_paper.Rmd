@@ -292,11 +292,11 @@ combat.summary <- p.combat.type + p.combat.exp + p.combat.cells
 combat.dendro + p.combat.cells
 
 ggsave(combat.dendro,
-       filename = here::here("Paper","results_1","2019-04-10_combat-dendrogram.png"),
+       filename = here::here("Paper","results_1","2019-combat-dendrogram.png"),
        width = 10, height=5,dpi = "print")
 
 ggsave(p.combat.cells,
-       filename = here::here("Paper","results_1","2019-04-10_combat-PCA.png"),
+       filename = here::here("Paper","results_1","2019-combat-PCA.png"),
        width = 6, height=5,dpi = "print")
 ```
 
