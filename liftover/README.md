@@ -8,9 +8,9 @@
 
 - `summit-to-peaks.txt`: Command line code used to convert lifted over, hg19 summit .BED files to peaks. Summits had +/- 250 bp added and then they were sorted. Peaks within each cell population were then merged and peaks intersecting with hg19 ENCODE blacklist regions were removed. These peaks are used in LDSC analysis and fine-mapping.
 	- Input: `hg19*summits.bed` (Zenodo: `hg19_summits_liftover.tar.gz`)
-	- Output: `cleaned_` (Zenodo: )
+	- Output: hg19 final peak .BED files (Zenodo: `hg19_final_peaks.tar.gz`)
 
-- `comparing-peaks.Rmd`: R code used to compare the number of features to be lifted over with the various strategies ("summits","all","strict"). Code includes the production of tables and figures.
-	- Input: `mouse-peaks.bed`, `all_peaks.bed`, `strict_peaks.bed`, `summit_peaks.bed`
+- `comparing-peaks.Rmd`: R code used to compare the number of features to be lifted over with the various strategies ("summits","all","strict"). Code includes the production of tables and figures. All input files are just the BED files for each individual population concatenated into one large bed.
+	- Input: `mouse-peaks.bed`, `all_peaks.bed`, `strict_peaks.bed`, `summit_peaks.bed` (Zenodo: `liftover_combined-bed.tar.gz`)
 	- Output: Figures and tables
 

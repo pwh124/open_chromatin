@@ -16,13 +16,13 @@ name="ATAC.human"
 count=`bedtools intersect -wa -a $a -b $b | uniq | wc -l`
 echo -e $a"\t"$b"\t"$name"\t"$count >> cd4_peak_overlap.txt
 
-# Naive roadmap
+# Naive roadmap. Not republished on Zenodo as this data exists
 b=cd4.naive_dnase.roadmap.bed
 name="naive.roadmap"
 count=`bedtools intersect -wa -a $a -b $b | uniq | wc -l`
 echo -e $a"\t"$b"\t"$name"\t"$count >> cd4_peak_overlap.txt
 
-# Memory roadmap
+# Memory roadmap. No republished on Zenodo as this data exists
 b=cd4.memory_dnase.roadmap.bed
 name="memory.roadmap"
 count=`bedtools intersect -wa -a $a -b $b | uniq | wc -l`
