@@ -6,7 +6,7 @@ This is the repositiory the for paper entitled:
 
 Most data processed and used by code in this repo is deposited on Zenodo: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253181.svg)](https://doi.org/10.5281/zenodo.3253181)
 
-Please contact me at phook2@jhmi.edu with any questions or comments.
+Please contact me at phook2 [at] jhmi.edu with any questions or comments.
 
 ## 09-04-2019
 
