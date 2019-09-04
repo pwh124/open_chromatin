@@ -1,12 +1,18 @@
 # open_chromatin
 
-This is the repositiory the for paper entitled:   
-"Heritability enrichment in open chromatin reveals cortical layer contributions to schizophrenia"  
-https://www.biorxiv.org/content/early/2018/09/26/427484
+This is the repositiory the for paper entitled:
+   
+"Leveraging mouse chromatin data for heritabilityenrichment informs common disease architecture andreveals cortical layer contributions to schizophrenia" [https://www.biorxiv.org/content/early/2018/09/26/42748](https://www.biorxiv.org/content/early/2018/09/26/427484) (link will be updated once the new manuscript becomes live)
 
-This repsitory will be continuously updated.
+Most data processed and used by code in this repo is deposited on Zenodo: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253181.svg)](https://doi.org/10.5281/zenodo.3253181)
 
-## 06-26-19
+Please contact me at phook2@jhmi.edu with any questions or comments.
+
+## 09-04-2019
+
+Major code update! All code added and updated for the second version of the manuscript posted on bioRxiv above. Each directory contains a README.md document in which I have provided detailed descriptions of all code in the directory.
+
+## 06-26-2019
 
 Added a bunch of code including code using in ATAC-seq alignment and peak calling (align_peak-calling), linkage disequilibrium score regression (ldsc), liftOver (liftover), comparison of peaks (peak_comparisons), read extraction from single-cell data (sc_read_extraction), and fine-mapping of SZ loci using PAINTOR (fine-mapping).
 

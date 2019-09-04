@@ -1,4 +1,5 @@
 *Data for this directory can be downloaded from Zenodo:*
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253181.svg)](https://doi.org/10.5281/zenodo.3253181)
 
 - `ldsc_make-annot.sh`: Script for running the "make_annot.py" script from [LDSC software (v1.0.0)](https://github.com/bulik/ldsc). The "make_annot.py" script takes .BED files and creates the annotation files needed to run LDSC.
 	- Input: hg19 peak .BED files (Zenodo: )
