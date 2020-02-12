@@ -1,0 +1,241 @@
+---
+title: "atac-2-atac"
+author: "Paul Hook"
+date: "12/10/2019"
+output: html_document
+---
+
+Load the required libraries
+```{r, libraries}
+library(dplyr)
+library(tibble)
+library(stringr)
+library(readr)
+library(dendextend)
+library(gplots)
+library(RColorBrewer)
+library(pheatmap)
+```
+
+Reading in the Jaccard index matrices as well as data that will be used to annotate the rows and columns. For these comparisons we could use whichever dataset we wanted because all ATAC-ATAC comparisons were thrown out in the other analyses (all, promoter, enhancer, dyadic)
+```{r setup, include=FALSE}
+# Loading in the jaccard data
+x <- read.table("../final.data/enh.matrix")
+
+# Loading in the ATAC-seq metadata and modifying names
+cell_annot <- readr::read_tsv("../cell-annot.txt") %>%
+  dplyr::mutate(filename=str_remove(filename,"summits_filter2_")) %>%
+  dplyr::mutate(filename=str_remove(filename,"_summits")) %>%
+  dplyr::mutate(filename2=str_replace_all(filename,"-","."))
+```
+
+Now we need to modify the jaccard matrix to just keep all ATAC-ATAC comparisons
+```{r}
+# Modifying the count matrix so columns are ATAC-seq populations and rows are DNAse
+atac <- x %>%
+  # Only keep columns that include data for ATAC-seq populations
+  dplyr::select(-starts_with("regions")) %>%
+  # Move the rownames into a column
+  tibble::rownames_to_column('filename') %>%
+  # Only keep rows for ATAC
+  dplyr::filter(str_detect(filename,"regions",negate = TRUE)) %>%
+  # Join matrix to ATAC names so the names are actually used
+  dplyr::left_join(.,cell_annot,by="filename") %>%
+  # Only keep things you want
+  dplyr::select(Name,everything(),-cells,-filename,-filename2) %>%
+  # Change column to rownames
+  tibble::column_to_rownames('Name') %>%
+  {.}
+
+# Do the same annotation so both sides of the matrix have the cell names
+atac.mod <- tibble::as_tibble(t(atac),rownames = "filename2") %>%
+  dplyr::left_join(.,cell_annot,by="filename2") %>%
+  dplyr::select(Name,everything(),-cells,-filename,-filename2) %>%
+  tibble::column_to_rownames('Name') %>%
+  {.}
+```
+
+Creating eventual heatmap annotation for the raw Jaccard statistics
+```{r heatmap-annotation}
+# Create annotation for the eventual heatmap
+# This annotation should be the same for rows and columns
+# In the end, we need to replicate what happens when the heatmap program clusters the data
+# Creating a temporary matrix
+tmp <- atac.mod
+
+# Now we need to cluster the data like the heatmap will
+# Performing heirarchial clustering
+atac.col <- hclust(dist(atac.mod), method = "ward.D")
+my_atac_col <- dendextend::cutree(tree=as.dendrogram(atac.col),
+                                  k=3,order_clusters_as_data = FALSE)
+my_atac_col <- as.data.frame(my_atac_col) %>%
+  tibble::rownames_to_column('Name')
+
+# Merge the heirarchial clustering with the ATAC names
+test <- merge(my_atac_col,cell_annot,by='Name',sort = FALSE) %>% 
+  dplyr::select(Name,"Type"=cells) %>% 
+  tibble::column_to_rownames("Name") 
+```
+
+Now time to make the heatmap for raw Jaccard statistics
+```{r raw-jaccard}
+# Setting the colors for the annotations
+ann_colors = list(
+    Type = c(Glia="#4DAF4A",
+              `Excitatory neurons`="#377EB8",
+              `Inhibitory neurons`="#984EA3",
+              `Dopaminergic neurons`="#E41A1C",
+              `Retina cells`="#FF7F00",
+              `T-cells`="#F781BF")
+)
+
+# Setting the palette for the heatmap
+pal.1 <- colorRampPalette(brewer.pal(9,"Reds"))
+
+# Making the heatmap
+pheno.map <- pheatmap(atac.mod,
+         clustering_method = "ward.D",
+         cluster_rows = T, cluster_cols = T,
+         color = pal.1(100),
+         cellwidth = 6,
+         cellheight = 6,
+         fontsize = 6,
+         main="Jaccard",
+         angle_col = "90",
+         number_color = "black",
+         fontsize_number = 10,
+         fontface="bold",
+         show_colnames = TRUE,
+         border_color = "NA",
+         fontsize_col = 6,
+         fontsize_row = 6,
+         annotation_colors = ann_colors,
+         annotation_row = test,
+         annotation_col = test,
+         annotation_names_row = FALSE,annotation_names_col = FALSE)
+
+# Printing the heatmap
+pdf(file = "../final.results/atac-jaccard.pdf",width = 6, height = 5)
+pheno.map
+dev.off()
+```
+
+Now we want to make a heatmap for "scaled" jaccard statistics
+```{r}
+# Create column annotation for the eventual heatmap
+# In the end, we need to replicate what happens when we scale the data in the heatmap
+# This annotation should be the same for rows and columns
+# Creating a scaled matrix
+scale.atac <- scale(atac.mod)
+
+# Now we need to cluster the data like the heatmap will
+# Performing heirarchial clustering
+atac.col <- hclust(dist(scale.atac), method = "ward.D")
+# Making a dataframe so clustering results can be used as annotation
+my_atac_col <- dendextend::cutree(tree=as.dendrogram(atac.col),
+                                  k=3,order_clusters_as_data = FALSE)
+my_atac_col <- as.data.frame(my_atac_col) %>%
+  tibble::rownames_to_column('Name')
+
+# Merge the heirarchial clustering with the ATAC names
+test <- merge(my_atac_col,cell_annot,by='Name',sort = FALSE) %>% 
+  dplyr::select(Name,"Type"=cells) %>% 
+  tibble::column_to_rownames("Name") 
+```
+
+Now time to make the heatmap for "scaled" Jaccard statistics
+```{r scaled-jaccard}
+# Setting the colors for the annotations
+ann_colors = list(
+    Type = c(Glia="#4DAF4A",
+              `Excitatory neurons`="#377EB8",
+              `Inhibitory neurons`="#984EA3",
+              `Dopaminergic neurons`="#E41A1C",
+              `Retina cells`="#FF7F00",
+              `T-cells`="#F781BF")
+)
+
+# Setting the palette for the heatmap
+pal.2 <- colorRampPalette(rev(brewer.pal(11,"RdBu")))
+
+# Making the heatmap
+pheno.map <- pheatmap(atac.mod,
+         clustering_method = "ward.D",
+         cluster_rows = T, cluster_cols = T,
+         color = pal.2(100),
+         scale = "column",
+         cellwidth = 6,
+         cellheight = 6,
+         fontsize = 6,
+         main="Scaled Jaccard",
+         angle_col = "90",
+         number_color = "black",
+         fontsize_number = 10,
+         fontface="bold",
+         show_colnames = TRUE,
+         border_color = "NA",
+         fontsize_col = 6,
+         fontsize_row = 6,
+         annotation_colors = ann_colors,
+         annotation_row = test,
+         annotation_col = test,
+         annotation_names_row = FALSE,annotation_names_col = FALSE)
+
+# Printing heatmap
+pdf(file = "../final.results/scale-atac-jaccard.pdf",width = 6, height = 5)
+pheno.map
+dev.off()
+
+```
+
+Now time to make the heatmap showing the correlation of Jaccard statistics between samples
+```{r}
+# Calculating the spearman correlation between all profiles
+cor.atac <- cor(atac.mod,method = "spearman")
+
+# Now we need to cluster the data like the heatmap will
+# Performing heirarchial clustering
+atac.col <- hclust(dist(cor.atac), method = "ward.D")
+my_atac_col <- dendextend::cutree(tree=as.dendrogram(atac.col),
+                                  k=3,order_clusters_as_data = FALSE)
+# Making a dataframe so clustering results can be used as annotation
+my_atac_col <- as.data.frame(my_atac_col) %>%
+  tibble::rownames_to_column('Name')
+
+# Merge the heirarchial clustering with the ATAC names
+test <- merge(my_atac_col,cell_annot,by='Name',sort = FALSE) %>% 
+  dplyr::select(Name,"Type"=cells) %>% 
+  tibble::column_to_rownames("Name") 
+```
+
+```{r correlation-heatmap}
+# Setting the palette for the heatmap
+pal.cor <- colorRampPalette(rev(brewer.pal(11,"RdGy")))
+
+# Making the heatmap
+cor.map <- pheatmap(cor.atac,
+         clustering_method = "ward.D",
+         cluster_rows = T, cluster_cols = T,
+         color = pal.2(100),
+         cellwidth = 6,
+         cellheight = 6,
+         fontsize = 6,
+         main="Jaccard correlation",
+         angle_col = "90",
+         number_color = "black",
+         fontsize_number = 10,
+         fontface="bold",
+         show_colnames = TRUE,
+         border_color = "NA",
+         fontsize_col = 6,
+         fontsize_row = 6,
+         annotation_colors = ann_colors,
+         annotation_row = test,
+         annotation_col = test,
+         legend_breaks = seq(-1, 1, length.out = 11))
+
+# Print results
+pdf(file = "../final.results/correlation-atac-jaccard.pdf",width = 6, height = 5)
+cor.map
+dev.off()
+```

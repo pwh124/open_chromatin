@@ -1,0 +1,629 @@
+---
+title: "ldsc-analysis"
+author: "Paul Hook"
+date: "01-22-2019"
+output: html_document
+---
+
+# Load needed libraries
+```{r reading in the data}
+library(here)
+library(tidyverse)
+library(pheatmap)
+library(RColorBrewer)
+library(patchwork)
+library(readr)
+library(openxlsx)
+library(dendextend)
+library(tibble)
+library(ggplotify)
+```
+
+# Read in the data
+```{r}
+# Load data and remove conditional results
+ldsc.dat <- read_tsv("all_h2_results.txt")
+
+# Summarize some key stats
+summary(is.na(ldsc.dat)) #no NAs which is good
+length(levels(as.factor(ldsc.dat$pheno))) #64 phenotypes which is what we want
+length(levels(as.factor(ldsc.dat$sample1))) #27 cell populations which is what we want
+
+# Since the data was merged via sample name on server, do all the columns that contain the sample name match (so we know the data was merged correctly)
+summary(ldsc.dat$sample1 == ldsc.dat$sample2)
+summary(ldsc.dat$sample1 == ldsc.dat$Category) 
+summary(ldsc.dat$sample2 == ldsc.dat$Category) # all samples match
+
+# Renaming and selecting columns
+dat <- ldsc.dat %>% 
+  dplyr::select(-sample2,-Category) %>% 
+  dplyr::rename(file=sample1)
+
+# Calculating:
+# p-value of Coefficient Z-score
+# -log10(P) of Coefficient Z-score
+dat <- dat %>%
+  dplyr::mutate(p=pnorm(`Coefficient_z-score`,lower.tail = FALSE)) %>%
+  dplyr::mutate(p.log10=-log10(p)) %>%
+  dplyr::mutate(signif.all=if_else(p.log10 >= -log10(0.05/(27*64)),"yes","no"))
+
+# Load cell annotation
+cell.annot <- read_tsv("cell-annot.txt",col_names = c("cell.pop","file","type"))
+head(cell.annot)
+
+# Load phenotype annotation
+pheno.annot <- read_tsv("LDSC_phenotypes.txt", col_names = c("pheno","pheno_name"))
+head(pheno.annot)
+
+#merging cell annots
+tmp <- merge(dat,cell.annot,by = "file")
+
+#merging pheno annots
+final <- merge(tmp,pheno.annot, by="pheno")
+
+#Selecting columns and rearranging them
+ldsc.final <- final %>%
+  dplyr::select(-file,-pheno) %>%
+  dplyr::select(cell.pop,phenotype=pheno_name,everything())
+
+levels(as.factor(ldsc.final$cell.pop))
+
+
+# Arranging the columns how I want them
+ldsc.final$cells.ordered<- factor(ldsc.final$cell.pop, c("Microglia","Microglia*","Astrocytes*","Oligodendrocytes*","NeuN negative","Excitatory Camk2a","Excitatory Layers II-III","Excitatory Layer IV","Excitatory Layer V","Excitatory Layers II-V*","Excitatory Layer VI","Excitatory Layer VI*","Excitatory DG*","Inhibitory Gad2","Inhibitory*","Inhibitory PV","Inhibitory VIP","Inhibitory MSN*","Embryonic DA forebrain","Embryonic DA midbrain","Cones (blue)","Cones (green)","Rods","CD4 T-cells","CD4 T-cells human","CD8 T-cells","CD8 T-cells human"))
+
+# Checking that everything is still intact
+levels(ldsc.final$cells.ordered)
+levels(as.factor(ldsc.final$cell.pop))
+summary(is.na(ldsc.final))
+
+# Rearranging the columns how I like them
+ldsc.final <- ldsc.final %>% 
+  dplyr::select(cell.pop,cells.ordered,type,everything())
+```
+
+# Write out all the results split by pheno
+```{r write_out}
+# I need to write out the results in a more intuitive way
+ldsc.write <- ldsc.final %>%
+  dplyr::select(cell.population=cells.ordered,everything(),-cell.pop) %>%
+  arrange(desc(`Coefficient_z-score`))
+
+# Checking levels again
+levels(ldsc.write$cell.population)
+
+# Splitting results
+split.results <- split(ldsc.write,ldsc.write$phenotype)
+
+# Write them out so each tab is a phenotype result
+write.xlsx(split.results, file = here("paper.results","ldsc.results_2019-11-15.xlsx"))
+```
+
+# Comparing results via Z-score
+```{r}
+# Creating a data matrix with diseases as rows and cell types as columns. The cells are filled with the coefficient z-score
+z.dat <- ldsc.final %>% 
+  dplyr::select(cell.pop,phenotype,`Coefficient_z-score`) %>%
+  spread(cell.pop,`Coefficient_z-score`) %>%
+  {.}
+
+# Making phenotype name into row name
+row.names(z.dat) <- z.dat$phenotype
+z.dat <- z.dat[,-1]
+
+# making the dataframe into a matrix
+z.matrix <- as.matrix(z.dat)
+
+# calculating correlation matrices comparing cells or diseases
+z.cell.cor.matrix <- cor(z.dat,method = "spearman")
+z.disease.cor.matrix <- cor(t(z.dat),method = "spearman")
+
+# Zscore (t?) greater than this -> qnorm((0.05/(27*64)),lower.tail = F)
+# Create text matrix for indicating significant cell populations
+tmp <- replace(z.matrix, z.matrix <= qnorm((0.05/(27*64)),lower.tail = F), " ")
+text.mat <- replace(tmp, tmp != " ", "*")
+
+# Working on adding annotation
+# column annotation
+my_hclust_cells <- hclust(dist(t(z.matrix)), method = "ward.D")
+my_cells_col <- cutree(tree=as.dendrogram(my_hclust_cells),k=4,order_clusters_as_data = FALSE)
+my_cells_col <- as.data.frame(my_cells_col) %>%
+  tibble::rownames_to_column('cell.pop') %>%
+  dplyr::left_join(ldsc.final,by="cell.pop") %>%
+  dplyr::select(cell.pop,my_cells_col,type) %>%
+  unique()
+
+rownames(my_cells_col) <- my_cells_col$cell.pop
+my_cells_col <- my_cells_col %>% dplyr::select(type)
+
+col <- c(Glia="#4DAF4A",
+         `Excitatory neurons`="#377EB8",
+         `Inhibitory neurons`="#984EA3",
+         `Dopaminergic neurons`="#E41A1C",
+         `Retina cells`="#FF7F00",
+         `T-cells`="#F781BF")
+
+ann_colors <- list(`type` = c("#4DAF4A","#377EB8","#984EA3","#E41A1C","#FF7F00","#F781BF"))
+names(ann_colors$`type`) <- c("Glia","Excitatory neurons","Inhibitory neurons","Dopaminergic neurons","Retina cells","T-cells")
+
+# Plot raw regression Z-scores in a heatmap. Cluster by disease and cells
+z.pheno.map <- pheatmap(z.matrix,
+         clustering_method = "ward.D",
+         cluster_rows = T, cluster_cols = T,
+         color = rev(brewer.pal(11,"RdGy")),
+         cellwidth = 11,
+         cellheight = 9,
+         fontsize_row = 8,
+         fontsize_col = 8,
+         cutree_rows = 4, cutree_cols = 3,
+         main = "Hierarchial clustering of regression coefficeint Z-scores",
+         angle_col = "45",
+         number_color = "black",
+         display_numbers = text.mat,
+         fontsize_number = 10,
+         fontface="bold",
+         annotation_col = my_cells_col,
+         border_color = NA,
+         annotation_colors = ann_colors,
+         fontface = "bold",
+         annotation_names_col = FALSE)
+
+test <- ggplotify::as.ggplot(z.pheno.map)
+
+ggsave("paper.results/2019-11-18_z-heatmap.pdf",plot = z.pheno.map, dpi="retina",width = 10, height = 12)
+```
+
+```{r}
+# Working on adding annotation
+# column annotation
+my_hclust_cells <- hclust(dist(t(z.cell.cor.matrix)), method = "ward.D")
+my_cells_col <- cutree(tree=as.dendrogram(my_hclust_cells),k=4,order_clusters_as_data = FALSE)
+my_cells_col <- as.data.frame(my_cells_col) %>%
+  tibble::rownames_to_column('cell.pop') %>%
+  dplyr::left_join(ldsc.final,by="cell.pop") %>%
+  dplyr::select(cell.pop,my_cells_col,type) %>%
+  unique()
+
+rownames(my_cells_col) <- my_cells_col$cell.pop
+my_cells_col <- my_cells_col %>% dplyr::select(type)
+
+# row annotation
+my_hclust_cells <- hclust(dist(z.cell.cor.matrix), method = "ward.D")
+my_cells_row <- cutree(tree=as.dendrogram(my_hclust_cells),k=4,order_clusters_as_data = FALSE)
+my_cells_row <- as.data.frame(my_cells_row) %>%
+  tibble::rownames_to_column('cell.pop') %>%
+  dplyr::left_join(ldsc.final,by="cell.pop") %>%
+  dplyr::select(cell.pop,my_cells_row,type) %>%
+  unique()
+
+rownames(my_cells_row) <- my_cells_row$cell.pop
+my_cells_row <- my_cells_row %>% dplyr::select(type)
+
+# Make the correlation map for cells
+cell.cor.map <- pheatmap(z.cell.cor.matrix,
+         clustering_method = "ward.D",
+         cluster_rows = T, cluster_cols = T,
+         color = rev(brewer.pal(11,"RdBu")),
+         cellwidth = 12,
+         cellheight = 12,
+         fontsize = 8,
+         cutree_rows = 3, cutree_cols = 3,
+         main = "Hierarchial clustering of Spearman correlation\nbetween cell population LDSC Z-scores",
+         angle_col = "45",
+         number_color = "black",
+         fontsize_number = 10,
+         fontface="bold",
+         show_colnames = TRUE,
+         annotation_col = my_cells_col,
+         annotation_colors = ann_colors,
+         annotation_row = my_cells_row,
+         annotation_names_col = FALSE)
+
+test.2 <- as.ggplot(cell.cor.map)
+
+plot_grid(test,test.2,ncol = 2)
+
+ggsave("paper.results/2019-11-18_z-corrmap.pdf",plot = cell.cor.map, dpi="retina",width = 10, height = 10)
+```
+
+```{r}
+# CD8
+cd8.cor.test <- cor.test(z.dat$`CD8 T-cells`, z.dat$`CD8 T-cells human`, method = "spearman",conf.level = 0.95)
+
+scatter_plot <- ggplot(z.dat, aes(`CD8 T-cells`, `CD8 T-cells human`))
+cd8.plot.co <- scatter_plot +
+  geom_point(size=2) +
+  labs(x = "mouse-to-human CD8, regression Z-score",
+       y = "human CD8, regression Z-score") +
+  geom_smooth(method="lm") + 
+  theme_classic() +
+  ggtitle("CD8 T-cells") +
+  annotate("text",x=0,y=4,
+           label=paste("Spearman's rho\n",round(cd8.cor.test$estimate[[1]],4))) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# CD4
+cd4.cor.test <- cor.test(z.dat$`CD4 T-cells`, z.dat$`CD4 T-cells human`, method = "spearman",conf.level = 0.95)
+
+scatter_plot <- ggplot(z.dat, aes(`CD4 T-cells`, `CD4 T-cells human`))
+cd4.plot.co <- scatter_plot +
+  geom_point(size=2) +
+  labs(x = "mouse-to-human CD4, regression Z-score",
+       y = "human CD4, regression Z-score") +
+  geom_smooth(method="lm") + 
+  theme_classic() +
+  ggtitle("CD4 T-cells") +
+  annotate("text",x=0,y=4,
+           label=paste("Spearman's rho\n",round(cd4.cor.test$estimate[[1]],4))) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+cd.plot.co <- cd4.plot.co + cd8.plot.co
+
+fin <- test + test.2/(cd4.plot.co+cd8.plot.co)
+
+
+ggsave("paper.results/fin.pdf",plot=fin,dpi='retina',width = 20,height = 16)
+
+ggsave("paper.results/2019-11-18_cd-coefficient.pdf",plot = cd.plot.co, dpi="retina",width = 10, height = 4)
+```
+
+```{r}
+# No annotation needed right now
+disease.cor.map <- pheatmap(z.disease.cor.matrix,
+         clustering_method = "ward.D",
+         cluster_rows = T, cluster_cols = T,
+         color = rev(brewer.pal(11,"RdBu")),
+         cellwidth = 12,
+         cellheight = 10,
+         fontsize = 10,
+         cutree_rows = 4, cutree_cols = 4,
+         main = "Hierarchial clustering of Spearman correlation\nbetween disease LDSC Z-scores",
+         angle_col = "45",
+         number_color = "black",
+         fontsize_number = 10,
+         fontface="bold",
+         show_colnames = TRUE)
+
+ggsave("paper.results/2019-11-18_z-pheno-corr.pdf",plot = disease.cor.map, dpi="retina",width = 15, height = 13)
+```
+
+a ggplot theme for LDSC results
+```{r}
+ldsc_theme <- theme_classic() +
+  theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 1.1,size = 8,family = "Helvetica",color="black",face = "bold"),
+        legend.position ="bottom",
+        plot.title = element_text(hjust = 0.5, face="bold",size=10,family="Helvetica", vjust = -1),
+        axis.text.y = element_text(size = 8,colour = "black",family = "Helvetica",face = "bold"),
+        axis.title.x = element_text(size=10,color = "black",family = "Helvetica",face="bold"),
+        axis.title.y = element_text(size=10,color = "black",family = "Helvetica",face="bold"),
+        panel.grid.major.y = element_line(color = "grey60",linetype = "dashed",size = 0.5),
+        #plot.title = element_blank(),
+        legend.text = element_text(size = 8,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'cm'),
+        legend.spacing.x = unit(0.1,'cm'),
+        legend.key.size = unit(1,'mm'),
+        legend.background = element_blank())
+
+
+small_ldsc_theme <- theme_classic() +
+  theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 1.1,
+                                   size = 8,family = "Helvetica",color="black",face="bold"),
+        legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=10,family="Helvetica", vjust = -1),
+        axis.text.y = element_text(size = 6,colour = "black",family = "Helvetica",face="bold"),
+        axis.title.x = element_text(size=6,color = "black",family = "Helvetica",face = "bold"),
+        axis.title.y = element_text(size=8,color = "black",family = "Helvetica",face = "bold"),
+        panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        #plot.title = element_blank(),
+        legend.text = element_text(size = 6,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'cm'),
+        legend.spacing.x = unit(0.1,'cm'),
+        legend.background = element_blank(),
+        legend.key.size = unit(1, 'mm'))
+```
+
+```{r making some plots}
+col <- c(Glia="#4DAF4A",
+         `Excitatory neurons`="#377EB8",
+         `Inhibitory neurons`="#984EA3",
+         `Dopaminergic neurons`="#E41A1C",
+         `Retina cells`="#FF7F00",
+         `T-cells`="#F781BF")
+
+gwas.levels <- levels(as.factor(ldsc.final$phenotype))
+ldsc.final$type <- factor(ldsc.final$type,levels=c("Glia","Excitatory neurons","Inhibitory neurons","Dopaminergic neurons","Retina cells","T-cells"))
+ldsc.final$plot.order <- with(ldsc.final, factor(cells.ordered, levels = rev(levels(cells.ordered))))
+
+#Setting plot limits for Z plots
+z.min <- min(ldsc.final$`Coefficient_z-score`)-0.5
+z.max <- max(ldsc.final$`Coefficient_z-score`)+0.5
+z.sig <- qnorm((0.05/(27*64)),lower.tail = F)
+
+#Setting plot limits for P-values
+p.min <- 0
+p.max <- 20
+p.sig <- -log10(0.05/(27*64))
+
+# Figure 3 and supplemental Z plots
+# Neuroticism
+p.neurot <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="Neuroticism"),
+            aes(x=plot.order,y=p.log10, color=type)) +
+  geom_hline(yintercept=p.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_point(size=2) +
+  ggtitle("Neuroticism") + ylim(p.min,p.max) +
+  ylab("-log10(Coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme +
+  coord_flip()
+
+# Do I want to look at enrichment? Z-score is really the stat from the regression
+e.neurot <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="Multiple sclerosis"),
+            aes(x=plot.order,y=Enrichment, color=type)) +
+  geom_errorbar(aes(ymin = Enrichment - 1.96*Enrichment_std_error, 
+                      ymax = Enrichment + 1.96*Enrichment_std_error),
+                  width = 0.5, size = 0.5) +
+  geom_point(size=2) +
+  ggtitle("Neuroticism") + ylim(-100,200) +
+  ylab("-log10(Coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme +
+  coord_flip()
+
+z.neurot <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="Neuroticism"),
+            aes(x=plot.order,y=`Coefficient_z-score`, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_hline(yintercept=0, 
+             color="black", lwd=0.6) +
+  geom_point(size=2) +
+  ggtitle("Neuroticism") + ylim(z.min,z.max) +
+  ylab("Regression Z-score") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme +
+  coord_flip()
+
+# MS
+p.ms <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="Multiple sclerosis"),
+            aes(x=plot.order,y=p.log10, color=type)) +
+  geom_hline(yintercept=p.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_point(size=2) +
+  ggtitle("Multiple sclerosis") + ylim(p.min,p.max) +
+  ylab("-log10(Coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme +
+  coord_flip()
+
+z.ms <- ggplot(ldsc.final %>% 
+               dplyr::filter(phenotype=="Multiple sclerosis"),
+            aes(x=plot.order,y=`Coefficient_z-score`, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_hline(yintercept=0, 
+             color="black", lwd=0.6) +
+  geom_point(size=2) +
+  ggtitle("Multiple sclerosis") + ylim(z.min,z.max) +
+  ylab("Regression Z-score") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme +
+  coord_flip()
+
+# Height
+p.height <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="Height"),
+            aes(x=plot.order,y=p.log10, color=type)) +
+  geom_hline(yintercept=p.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_point(size=2) +
+  ggtitle("Height") + ylim(p.min,p.max) +
+  ylab("-log10(Coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme +
+  coord_flip()
+
+z.height <- ggplot(ldsc.final %>% 
+               dplyr::filter(phenotype=="Height"),
+            aes(x=plot.order,y=`Coefficient_z-score`, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_hline(yintercept=0, 
+             color="black", lwd=0.6) +
+  geom_point(size=2) +
+  ggtitle("Height (GIANT)") + ylim(z.min,z.max) +
+  ylab("Regression Z-score") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme +
+  coord_flip()
+
+figure3 <- p.ms + p.height + p.neurot + plot_layout(ncol = 1)
+suppfigure <- z.ms + z.height + z.neurot + plot_layout(ncol = 1)
+
+ggsave("paper.results/2019-11-19_Figure3.pdf",plot=figure3,dpi="retina",height = 8.5,width = 5)
+ggsave("paper.results/2019-11-19_suppFigure.pdf",plot=suppfigure,dpi="retina",height = 8.5,width = 5)
+
+```
+
+Making a the larger figures
+```{r}
+#Figure 4 and supplementary figure
+# ClOZUK
+p.clozuk.sz <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="Schizophrenia - CLOZUK"),
+            aes(x=plot.order,y=p.log10, color=type)) +
+  geom_hline(yintercept=p.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_point(size=4) +
+  ggtitle("Schizophrenia - CLOZUK") + ylim(p.min,p.max) +
+  ylab("-log10(Coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  ldsc_theme +
+  coord_flip()
+
+z.clozuk.sz <- ggplot(ldsc.final %>% 
+                      dplyr::filter(phenotype=="Schizophrenia - CLOZUK"),
+            aes(x=plot.order,y=`Coefficient_z-score`, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_hline(yintercept=0, 
+             color="black", lwd=0.6) +
+  geom_point(size=4) +
+  ggtitle("Schizophrenia (CLOZUK)") + ylim(z.min,z.max) +
+  ylab("Regression Z-score") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  ldsc_theme +
+  coord_flip()
+
+# PGC
+p.sz.pgc <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="SZ - PGC only"),
+            aes(x=plot.order,y=p.log10, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_point(size=2) +
+  ggtitle("Schizophrenia (PGC only)") + ylim(p.min,p.max) +
+  ylab("-log10(Coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme + theme(legend.position = "none",
+                           panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+                           plot.title = element_text(hjust = 0.5,
+                                                     face="bold",size=7,
+                                                     family="Helvetica", vjust = -1)) +
+  coord_flip()
+
+z.sz.pgc <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="SZ - PGC only"),
+            aes(x=plot.order,y=`Coefficient_z-score`, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_hline(yintercept=0, 
+             color="black", lwd=0.6) +
+  geom_point(size=2) +
+  ggtitle("Schizophrenia (PGC only)") + ylim(z.min,z.max) +
+  ylab("Regression Z-score") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme + theme(legend.position = "none",
+                           panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+                           plot.title = element_text(hjust = 0.5,
+                                                     face="bold",size=7,
+                                                     family="Helvetica", vjust = -1)) +
+  coord_flip()
+
+
+#Bipolar
+p.bd <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="Bipolar disorder"),
+            aes(x=plot.order,y=p.log10, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_point(size=2) +
+  ggtitle("Bipolar disorder") + ylim(p.min,p.max) +
+  ylab("-log10(Coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme + theme(legend.position = "none",
+                           panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+                           plot.title = element_text(hjust = 0.5,
+                                                     face="bold",size=7,
+                                                     family="Helvetica", vjust = -1)) +
+  coord_flip()
+
+z.bd <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="Bipolar disorder"),
+            aes(x=plot.order,y=`Coefficient_z-score`, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_hline(yintercept=0, 
+             color="black", lwd=0.6) +
+  geom_point(size=2) +
+  ggtitle("Bipolar disorder") + ylim(z.min,z.max) +
+  ylab("Regression Z-score") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme + theme(legend.position = "none",
+                           panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+                           plot.title = element_text(hjust = 0.5,
+                                                     face="bold",size=7,
+                                                     family="Helvetica", vjust = -1)) +
+  coord_flip()
+
+#SZ vs BD
+p.sz.v.bd <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="SZ vs. BD"),
+            aes(x=plot.order,y=p.log10, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_point(size=2) +
+  ggtitle("Schizophrenia\n vs. bipolar disorder") + ylim(p.min,p.max) +
+  ylab("-log10(Coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme + theme(legend.position = "none",
+                           panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+                           plot.title = element_text(hjust = 0.5,
+                                                     face="bold",size=7,
+                                                     family="Helvetica", vjust = -1)) +
+  coord_flip()
+
+z.sz.v.bd <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="SZ vs. BD"),
+            aes(x=plot.order,y=`Coefficient_z-score`, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_hline(yintercept=0, 
+             color="black", lwd=0.6) +
+  geom_point(size=2) +
+  ggtitle("Schizophrenia\n vs. bipolar disorder") + ylim(z.min,z.max) +
+  ylab("Regression Z-score") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme + theme(legend.position = "none",
+                           panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+                           plot.title = element_text(hjust = 0.5,
+                                                     face="bold",size=7,
+                                                     family="Helvetica", vjust = -1)) +
+  coord_flip()
+
+#SZandBD
+p.sz.and.bd <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="Bipolar-SZ vs. controls"),
+            aes(x=plot.order,y=p.log10, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_point(size=2) +
+  ggtitle("Bipolar-SZ vs. controls") + ylim(p.min,p.max) +
+  ylab("-log10(Coefficient P-value)") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme + theme(legend.position = "none",
+                           panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+                           plot.title = element_text(hjust = 0.5,
+                                                     face="bold",size=7,
+                                                     family="Helvetica", vjust = -1)) +
+  coord_flip()
+
+z.sz.and.bd <- ggplot(ldsc.final %>% 
+                   dplyr::filter(phenotype=="Bipolar-SZ vs. controls"),
+            aes(x=plot.order,y=`Coefficient_z-score`, color=type)) +
+  geom_hline(yintercept=z.sig, 
+             color="blue", linetype="longdash", lwd=0.75, alpha = 0.75) +
+  geom_hline(yintercept=0, 
+             color="black", lwd=0.6) +
+  geom_point(size=2) +
+  ggtitle("Bipolar-SZ vs. controls") + ylim(z.min,z.max) +
+  ylab("Regression Z-score") + xlab("") +
+  scale_color_manual(name = "", values = col) +
+  small_ldsc_theme + theme(legend.position = "none",
+                           panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+                           plot.title = element_text(hjust = 0.5,
+                                                     face="bold",size=7,
+                                                     family="Helvetica", vjust = -1)) +
+  coord_flip()
+
+# Figure 4
+p.all.plot <- p.clozuk.sz + ((p.sz.pgc + p.bd)/(p.sz.and.bd + p.sz.v.bd))
+z.all.plot <- z.clozuk.sz + ((z.sz.pgc + z.bd)/(z.sz.and.bd + z.sz.v.bd))
+ggsave("paper.results/2019-11-19_SZ-Figure4.pdf",plot = p.all.plot, dpi = "retina", width = 10, height = 6)
+ggsave("paper.results/2019-11-19_SZ-supp.pdf",plot = z.all.plot, dpi = "retina", width = 10, height = 6)
+```
+
+

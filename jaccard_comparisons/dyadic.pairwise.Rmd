@@ -1,0 +1,153 @@
+---
+title: "dyadic-pairwise"
+author: "Paul Hook"
+date: "10/24/2019"
+output: html_document
+---
+
+Loading the required libraries
+```{r, libraries}
+library(dplyr)
+library(tibble)
+library(stringr)
+library(readr)
+library(dendextend)
+library(gplots)
+library(RColorBrewer)
+library(pheatmap)
+```
+
+Reading in the Jaccard index matrices as well as data that will be used to annotate the rows and columns.
+```{r load-data, include=FALSE}
+# Loading in the jaccard data
+x <- read.table("../final.data/dyadic.matrix")
+
+# Loading in the Epigenome Roadmap Atlas cell population names
+eid <- readr::read_tsv("../EIDlegend_mod.txt")
+
+# Loading in the ATAC-seq metadata and modifying names
+cell_annot <- readr::read_tsv("../cell-annot.txt") %>%
+  dplyr::mutate(filename=str_remove(filename,"summits_filter2_")) %>%
+  dplyr::mutate(filename=str_remove(filename,"_summits")) %>%
+  dplyr::mutate(filename=str_replace_all(filename,"-","."))
+```
+
+Now we need to modify the jaccard matrix to just keep all ATAC-DNAse comparisons. ATAC profiles will be columns and DNAse will be rows so we can make a nice looking heatmap
+```{r modify-matrix}
+# Modifying the count matrix so columns are ATAC-seq populations and rows are DNAse
+x.names <- x %>%
+  # Only keep columns that include data for ATAC-seq populations
+  dplyr::select(-starts_with("regions")) %>%
+  # Move the rownames into a column
+  tibble::rownames_to_column('eid') %>%
+  # Only keep rows for DNAse
+  dplyr::filter(str_detect(eid,"regions")) %>%
+  # Remove prefix from names
+  dplyr::mutate(eid=str_replace(eid,"regions_dyadic_","")) %>%
+  # Join matrix to Roadmap names so the names are actually used
+  dplyr::left_join(.,eid,by="eid") %>%
+  # Only keep things you want
+  dplyr::select(Name,everything(),-eid,-roadmap_name,-Category,-Type) 
+
+# Make rownames the Roadmap names
+row.names(x.names) <- x.names$Name
+x.names <- x.names[,-1]
+
+# Now annotate the ATAC-seq samples with the names used in the paper
+# First transpose the matrix
+flip <- tibble::as_tibble(t(x.names),rownames = "filename") %>%
+  # Join it to the cell annoation
+  dplyr::left_join(.,cell_annot,by="filename") %>%
+  # Select columns we want to keep
+  dplyr::select(Name,everything(),-filename,-cells) %>%
+  # Change colun to rownames and transpose back
+  tibble::column_to_rownames('Name') %>% t()
+```
+
+Creating eventual heatmap annotation
+```{r heatmap-annotation}
+# Create column annotation for the eventual heatmap
+# In the end, we need to replicate what happens when we scale the date in the headmap
+# Here we are flipping the matrix and calculating the Z-scores within an ATAC-seq sample
+tmp <- t(flip)
+scale_rows = function(x){
+    m = apply(x, 1, mean, na.rm = T)
+    s = apply(x, 1, sd, na.rm = T)
+    return((x - m) / s)
+}
+tmp2 <- scale_rows(tmp)
+
+# Now we need to cluster the data like the heatmap will
+# Performing heirarchial clustering
+my_hclust_eid<- hclust(dist(t(tmp2)), method = "ward.D")
+# Making a dataframe so clustering results can be used as annotation
+my_eid_col <- dendextend::cutree(tree=as.dendrogram(my_hclust_eid),
+                                 k=3,order_clusters_as_data = FALSE)
+my_eid_col <- as.data.frame(my_eid_col) %>%
+  tibble::rownames_to_column('Name')
+
+# Merge the heirarchial clustering with the Roadmap names
+test <- merge(my_eid_col,eid,by='Name',sort = FALSE) %>% 
+  dplyr::select(Name,"Roadmap category"=Category) %>% 
+  tibble::column_to_rownames("Name") 
+
+# Creating row annotation
+# Doing the same thing above but with ATAC-seq datasets
+# Performing heirarchial clustering
+my_hclust_cells<- hclust(dist(tmp2), method = "ward.D")
+# Making a dataframe so clustering results can be used as annotation
+my_cells_col <- dendextend::cutree(tree=as.dendrogram(my_hclust_cells),
+                                   k=3, order_clusters_as_data = FALSE)
+my_cells_col <- as.data.frame(my_cells_col) %>%
+  tibble::rownames_to_column('Name')
+
+# Merge the heirarchial clustering with the ATAC cell annotations
+cells.dat <- merge(my_cells_col, cell_annot, by='Name',sort = FALSE) %>% 
+  dplyr::select(Name,"Type"=cells) %>% 
+  tibble::column_to_rownames("Name") 
+```
+
+```{r heatmap}
+# Setting the colors for the annotations
+ann_colors = list(
+    Type = c(Glia="#4DAF4A",
+              `Excitatory neurons`="#377EB8",
+              `Inhibitory neurons`="#984EA3",
+              `Dopaminergic neurons`="#E41A1C",
+              `Retina cells`="#FF7F00",
+              `T-cells`="#F781BF"),
+    `Roadmap category` = RColorBrewer::brewer.pal(11,"Set3")
+)
+# Setting the factor levels for Roadmap categories
+names(ann_colors$`Roadmap category`) <- levels(factor(test$`Roadmap category`))
+
+# Setting the palette for the heatmap
+pal <- colorRampPalette(rev(brewer.pal(11,"RdBu")))
+
+# Making the heatmap
+pheno.map <- pheatmap(flip,
+         clustering_method = "ward.D",
+         cluster_rows = T, cluster_cols = T,
+         color = pal(100),
+         scale = "column",
+         cellwidth = 11,
+         cellheight = 10,
+         angle_col = "45",
+         number_color = "black",
+         fontsize_number = 10,
+         fontface="bold",
+         show_colnames = TRUE,
+         border_color = "NA",
+         annotation_col = cells.dat,
+         annotation_row = test,
+         fontsize_col = 8,
+         fontsize_row = 8,
+         annotation_colors = ann_colors,
+         annotation_names_col = FALSE, annotation_names_row = FALSE,
+         fontfamily="Helvetica")
+
+# Printing the heatmap
+pdf(file = "../final.results/dyadic-heatmap.pdf",width = 12, height = 20)
+pheno.map
+dev.off()
+```

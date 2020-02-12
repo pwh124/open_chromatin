@@ -1,0 +1,20 @@
+# Processing barcodes obtained from Preissl, 2018
+# Cluster-barcode map and cluster identity were obtained from Sebastian Preissl, David U. Gorkin, and Rongxin Fang, and were used and published with permission
+
+# Download the needed file that contains the barcode-cluster
+wget p56_cluster.txt
+
+# How many barcodes do we have
+wc -l p56_cluster.txt
+
+# Process barcodes so the barcodes from different replicates are split
+grep "rep1_" p56_cluster.txt | sed 's/rep1_//g' > p56_rep1_barcodes.txt
+grep "rep2_" p56_cluster.txt | sed 's/rep2_//g' > p56_rep2_barcodes.txt
+
+# Futher process barcodes so that they are split by cluster. It is being set up this way so that we can take advantage of the BBMAP demux tool
+
+for i in {1..9}
+do 
+awk -v var="$i" '$2==var {print $1}' p56_rep1_barcodes.txt > cluster_barcodes/C${i}_p56.rep1_barcodes.txt
+awk -v var="$i" '$2==var {print $1}' p56_rep2_barcodes.txt > cluster_barcodes/C${i}_p56.rep2_barcodes.txt
+done

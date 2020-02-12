@@ -1,0 +1,64 @@
+ADHD_PGC  	ADHD
+Alz_Marioni  	Alzheimers
+BMI-GIANT-2015  	BMI
+Epilepsy_All  	Epilepsy - all
+Epilepsy_Focal  	Epilepsy - focal
+Epilepsy_GGE  	Epilepsy - GGE
+final.frq_SZ-CLOZUK  	Schizophrenia - CLOZUK
+frq_Height-GIANT  	Height
+insomnia-2018  	Insomnia
+Intelligence-2018  	Education years
+MDD-2018  	MDD
+munged_BDSCZvsCONT  	Bipolar-SZ vs. controls
+munged_BDvsCONT  	Bipolar disorder
+munged_blood_EOSINOPHIL_COUNT  	Eosinophil count
+munged_blood_HIGH_LIGHT_SCATTER_RETICULOCYTE_COUNT  	High light scatter reticulocyte count
+munged_blood_LYMPHOCYTE_COUNT  	Lymphocyte count
+munged_blood_MEAN_SPHERED_CELL_VOL  	Mean sphered cell volume
+munged_blood_MONOCYTE_COUNT  	Monocyte count
+munged_blood_RBC_DISTRIB_WIDTH  	Red blood cell distribution width
+munged_blood_WHITE_COUNT  	White blood cell count
+munged_body_BALDING1  	Balding type I
+munged_body_BALDING4  	Balding type IV
+munged_body_WHRadjBMIz  	Waist-hip ratio
+munged_bp_DIASTOLICadjMEDz  	Diastolic blood pressure
+munged_bp_SYSTOLICadjMEDz  	Systolic blood pressure
+munged_cov_SMOKING_STATUS  	Smoking status
+munged_disease_AID_ALL  	Autoimmune traits
+munged_disease_ALLERGY_ECZEMA_DIAGNOSED  	Eczema
+munged_disease_ASTHMA_DIAGNOSED  	Asthma
+munged_disease_CARDIOVASCULAR  	Cardiovascular diseases
+munged_disease_HI_CHOL_SELF_REP  	High cholesterol
+munged_disease_THYROID_ANY_SELF_REP  	Thyroid disease
+munged_impedance_BASAL_METABOLIC_RATEz  	Basal metabolic rate
+munged_lung_FEV1FVCzSMOKE  	FEV1-FVC ratio
+munged_lung_FVCzSMOKE  	Forced vital capacity (FVC)
+munged_other_MORNINGPERSON  	Morning person
+munged_pigment_SUNBURN  	Sunburn occasion
+munged_repro_AgeFirstBirth_Female  	Female age at first birth
+munged_repro_MENARCHE_AGE  	Age at menarche
+munged_repro_MENOPAUSE_AGE  	Age at menopause
+munged_repro_NumberChildrenEverBorn_Pooled  	Number children (pooled)
+munged_SZvsBD  	SZ vs. BD
+munged_SZvsCONT  	SZ - PGC only
+frq_Neurot-Nagel  	Neuroticism
+PASS_Anorexia  	Anorexia
+PASS_Autism  	Autism
+PASS_Celiac  	Celiacs disease
+PASS_Coronary_Artery_Disease  	Coronary artery disease
+PASS_Crohns_Disease  	Crohns disease
+PASS_DS  	Depressive symptoms
+PASS_Ever_Smoked  	Ever smoked
+PASS_Fasting_Glucose  	Fasting glucose
+PASS_HDL  	HDL
+PASS_IBD  	IBD
+PASS_LDL  	LDL
+PASS_Lupus  	Lupus
+PASS_Multiple_sclerosis  	Multiple sclerosis
+PASS_Primary_biliary_cirrhosis  	Primary biliary cirrhosis
+PASS_Rheumatoid_Arthritis  	Rheumatoid arthritis
+PASS_SWB  	Subject well being
+PASS_Triglycerides  	Triglycerides
+PASS_Type_1_Diabetes  	Type 1 Diabetes
+PASS_Type_2_Diabetes  	Type 2 Diabetes
+PASS_Ulcerative_Colitis  	Ulcerative colitis
