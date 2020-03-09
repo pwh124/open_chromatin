@@ -154,3 +154,63 @@ pdf(file = "../final.results/all-heatmap.pdf",width = 12, height = 20)
 pheno.map
 dev.off()
 ```
+
+Making a heat map that will better fit on a published figure
+```{r}
+new.map <- pheatmap(flip,
+         clustering_method = "ward.D",
+         cluster_rows = T, cluster_cols = T,
+         color = pal(100),
+         scale = "column",fontsize = 8,
+         cellwidth = 8,
+         cellheight = 2,
+         main="Roadmap promoters",
+         number_color = "black",
+         fontsize_number = 10,
+         fontface="bold",
+         show_colnames = TRUE,
+         border_color = "NA",
+         annotation_col = cells.dat,
+         annotation_names_col = FALSE, annotation_names_row = FALSE,
+         annotation_row = test,
+         fontsize_col = 6,
+         fontsize_row = 2,
+         annotation_colors = ann_colors,
+         angle_col = "45",
+         fontfamily="Helvetica")
+new.map
+
+pdf(file = "../final.results/publication-promoter-heatmap.pdf",width = 10, height = 6)
+new.map
+dev.off()
+```
+
+# Need to modify the figure above to be smaller for publication
+```{r}
+new.map <- pheatmap(flip,
+         clustering_method = "ward.D",
+         cluster_rows = T, cluster_cols = T,
+         color = pal(100),
+         scale = "column",fontsize = 8,
+         cellwidth = 10,
+         cellheight = 2,
+         main="All Imputed Roadmap DNase",
+         number_color = "black",
+         fontsize_number = 10,
+         fontface="bold",
+         show_colnames = TRUE,
+         border_color = "NA",
+         annotation_col = cells.dat,
+         annotation_names_col = FALSE, annotation_names_row = FALSE,
+         annotation_row = test,
+         fontsize_col = 8,
+         fontsize_row = 2,
+         annotation_colors = ann_colors,
+         angle_col = "45",
+         fontfamily="Helvetica")
+new.map
+
+pdf(file = "../final.results/publication-all-heatmap.pdf",width = 10, height = 6)
+new.map
+dev.off()
+```
