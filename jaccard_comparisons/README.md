@@ -5,10 +5,12 @@
 	- Input: Roadmap BED files, mouse to human ATAC-seq BED files (Zenodo: `hg19_final_peaks.tar.gz`)  
 	- Output: `*.matrix` (Zenodo: `revise_jaccard_matrices.tar.gz`)
 
-- `*.pairwise.Rmd`: RMarkdown files containing R scripts for processing and visualizing pairwise Jaccard statistics. These scripts specifically process and visualize ATAC-seq profiles compared to Roadmap DHS data.
-	- Input: `*.matrix` files, `cell-annot.txt` (cell annotation file), and `EIDlegend_mod.txt` (Roadmap annotation file)
+- `*.pairwise.Rmd`: RMarkdown files containing R scripts for processing and visualizing pairwise Jaccard statistics. These scripts specifically process and visualize ATAC-seq profiles compared to Roadmap DHS data. Note: two versions of the heatmaps are present in `output/` - a "large" version and the version that was used in the publication.
+	- Input: `*.matrix` files (Zenodo: `revise_jaccard_matrices.tar.gz`), `cell-annot.txt` (cell annotation file), and `EIDlegend_mod.txt` (Roadmap annotation file)
 	- Output: Heatmaps! See `output/` directory
 
 - `atac-jaccard.Rmd`: RMarkdown file containing R scripts for processing and visualizing pairwise Jaccard statistics. This script specifically processes and visualizes ATAC-seq profiles compared to ATAC-seq profiles.
-	- Input: `enh.matrix` file and `cell-annot.txt` (cell annotation file)
+	- Input: `enh.matrix` or any `*.matrix` file (Zenodo: `revise_jaccard_matrices.tar.gz`) and `cell-annot.txt` (cell annotation file)
 	- Output: Heatmaps! See `output/` directory
+
+**To Do**: Add alternative figures to output
