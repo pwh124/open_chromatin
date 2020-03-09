@@ -16,6 +16,7 @@ library(patchwork)
 library(cqn)
 library(sva)
 library(formattable)
+library(ggrepel)
 ```
 
 ```{r read_in_data}
@@ -52,7 +53,6 @@ pheno.df <- read.delim(file = pheno.dir, header = T) %>%
         cell.cat == 'Dopaminergic neurons' ~ "#E41A1C",
         cell.cat == 'Retina cells' ~ "#FF7F00",
         cell.cat == 'T-cells' ~ "#F781BF"))
-
 ```
 
 I first wanted to look at the "raw data" density distributions so I could get a feel as to how to this data looks before normalization. First I copy the "counts_named" object so I do not accidentally modify the original data.
@@ -157,6 +157,9 @@ p.log2.cells <- p.log2.cells+geom_point(size=2) + theme_classic() +
 
 log2.summary <- log2.dendro / (p.log2.type + p.log2.exp + p.log2.cells)
 
+# writing out matrix of log2 transformed counts
+log2.write <- cbind(anno,counts.log2) #using new anno with 0 based counts and GC
+write_tsv(log2.write,path = "~/zenodo_final/mm10_peak-count_matrices/mm10.log2counts.matrix.txt",col_names = TRUE)
 ```
 
 # According to Sarah. there are a few steps in order to set up the data for CQN normalization. Step one is to calculate the sizeFactors which can be done from the "peak_summary" and this will be stored as "sizeFactor."
@@ -190,6 +193,10 @@ hist(normalized.counts, main = "CQN Normalized counts histogram")
 #Performing ComBat in order to remove "batch" data
 mod0 = model.matrix(~1,data=pheno.df)
 combat_data_type <- ComBat(dat=normalized.counts, batch = pheno.df$type, mod=mod0, par.prior = T, prior.plots = F)
+
+# Write this out
+combat.write <- cbind(anno,combat_data_type) #using new anno with 0 based counts and GC
+write_tsv(combat.write,path = "~/zenodo_final/mm10_peak-count_matrices/mm10.combat.counts.matrix.txt",col_names = TRUE)
 
 # Plotting combined count data
 hist(combat_data_type, main = "CQN/ComBat normalaized counts histogram")
@@ -235,7 +242,7 @@ combat.dendro <- ggplot(segment(dend_data)) +
         text = element_text(family = "Helvetica")) +
   ylim(c(-1,2)) + xlim(c(-1,26)) +
   scale_color_manual(name = "", values = col) +
-  theme(plot.margin = margin(0, -2, 0,-2, "cm"))
+  #theme(plot.margin = margin(0, -2, 0,-2, "cm")) +
   NULL
 
 #Performing PCA 
@@ -310,11 +317,11 @@ scree.combat <- ggscreeplot(pca.combat, type = "pev") +
 ```{r}
 library(tsne)
 
-nComponents <- 6
+nComponxents <- 6
 seed <- 1834
 set.seed(seed) #setting seed
 
-combat.tsne<-tsne(pca.combat$x[,1:nComponents],perplexity=5,max_iter=10000,whiten = T)
+combat.tsne<-tsne(pca.combat$x[,1:nComponents],perplexity=5,max_iter=10000,whiten=T)
 
 pheno.df$tsne1 <- combat.tsne[,1]
 pheno.df$tsne2 <- combat.tsne[,2]
@@ -342,15 +349,9 @@ tsne.cat <-ggplot(pheno.df, aes(x=tsne1,y=tsne2,color=cell.cat,label=cell.popula
   geom_text_repel(data=subset(pheno.df, cell.population == "Inhibitory*" | cell.population == "Inhibitory MSN*"),
             aes(tsne1,tsne2,label=cell.population),family="Helvetica",size=2.5,hjust=0,vjust=0,seed = 24)
 
-final.tsne.cat <- tsne.cat + theme(plot.margin = margin(0.5, 3, 0.5, 3, "cm"))
+fig1a <- combat.dendro + tsne.cat
 
-fig1a <- combat.dendro + final.tsne.cat
-
-#pdf(file = "Figure1A_dendro-tsne.pdf",height = 4, width = 8)
-#fig1a
-#dev.off()
-
-pdf(file = "Figure1A_dendro-tsne_V2.pdf",height = 4, width = 8)
+pdf(file = "Figure1A_dendro-tsne.pdf",height = 4, width = 8)
 fig1a
 dev.off()
 ```
