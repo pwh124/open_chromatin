@@ -1,0 +1,9 @@
+filename	total.peaks
+all.roadmap_cd4_atac.bed	493894
+all.roadmap_cd8_atac.bed	494569
+cd8.memory_dnase.roadmap.bed	80049
+cd8.naive_dnase.roadmap.bed	77770
+final_CD8-summits_corces_hg19_summits.bed	40916
+merged_cd8_atac.roadmap.bed	90267
+merged_roadmap_imputed_DNase.bed	493894
+summits_filter2_cd8_mm10_merged_GSE107076_summits.bed	38299

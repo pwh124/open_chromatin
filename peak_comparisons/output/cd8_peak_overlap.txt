@@ -1,0 +1,7 @@
+human.mouse	filename	cd8.count
+summits_filter2_cd8_mm10_merged_GSE107076_summits.bed	final_CD8-summits_corces_hg19_summits.bed	ATAC.human	 16674
+summits_filter2_cd8_mm10_merged_GSE107076_summits.bed	cd8.naive_dnase.roadmap.bed	naive.roadmap	 22927
+summits_filter2_cd8_mm10_merged_GSE107076_summits.bed	cd8.memory_dnase.roadmap.bed	memory.roadmap	 22689
+summits_filter2_cd8_mm10_merged_GSE107076_summits.bed	merged_cd8_atac.roadmap.bed	combined.atac.roadmap	 23698
+summits_filter2_cd8_mm10_merged_GSE107076_summits.bed	merged_roadmap_imputed_DNase.bed	all.roadmap	 31757
+summits_filter2_cd8_mm10_merged_GSE107076_summits.bed	all.roadmap_cd8_atac.bed	all.roadmap.plus.atac	 31796
