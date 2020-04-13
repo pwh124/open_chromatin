@@ -1,5 +1,5 @@
 *Data for this directory can be downloaded from Zenodo:*
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253181.svg)](https://doi.org/10.5281/zenodo.3253181)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253180.svg)](https://doi.org/10.5281/zenodo.3253180)
 
 #### This directory contains code for downloading, processing, and analyzing chromatin interaction from:
 Song, 2019. "Mapping cis-regulatory chromatin contacts in neural cells links neuropsychiatric disorder risk variants to target genes." Nat. Gen. doi: [https://doi.org/10.1038/s41588-019-0472-1] (https://doi.org/10.1038/s41588-019-0472-1).

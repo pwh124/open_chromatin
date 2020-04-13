@@ -1,5 +1,5 @@
 *Data for this directory can be downloaded from Zenodo*:
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253181.svg)](https://doi.org/10.5281/zenodo.3253181)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253180.svg)](https://doi.org/10.5281/zenodo.3253180)
 
 - `boca.sh`: Shell script containing command line code to obtain and process ATAC-seq peak files from the [Brain Open Chromatin Atlas (BOCA)](https://genome.cshlp.org/content/early/2018/06/26/gr.232488.117). Peak files were downloaded, minor modifications were made, and neuronal peak files were combined, sorted, and merged.
 	- Input: NA

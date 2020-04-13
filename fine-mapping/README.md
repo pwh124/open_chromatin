@@ -1,5 +1,5 @@
 *Data for this directory can be downloaded from Zenodo:*
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253181.svg)](https://doi.org/10.5281/zenodo.3253181)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253180.svg)](https://doi.org/10.5281/zenodo.3253180)
 
 - `proxy-snps.R`: An R script that takes independent lead SNPs as reported in Pardinas, 2018 (Supplemental Table 3; "Pardinas_TableS3_new.txt") and finds all the proxy SNPs in 1000 Genomes EUR superpopulation using the R package [proxysnps](https://github.com/slowkow/proxysnps). SNPs are output if they have and r^2 >= 0.1 with the lead SNP and a minor allele frequency >= 0.01. Output is 177 separate locus files.
 	- Input: `Pardinas_TableS3_new.txt` (included)

@@ -1,5 +1,5 @@
 *Data for this directory can be downloaded from  :*
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253181.svg)](https://doi.org/10.5281/zenodo.3253181)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253180.svg)](https://doi.org/10.5281/zenodo.3253180)
 
 ###This is a directory containing code for analyzing subsets of mouse-derived human peaks. Note that scripts used for setting up the files used in LDSC were the same used in the full analysis (see `ldsc/` directory). This includes all the batch scripts and the `annot` and `ldscore` scripts.
 

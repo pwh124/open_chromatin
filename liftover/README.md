@@ -1,5 +1,5 @@
 *Data for this directory can be downloaded from Zenodo*:
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253181.svg)](https://doi.org/10.5281/zenodo.3253181)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253180.svg)](https://doi.org/10.5281/zenodo.3253180)
 
 - `batch-summit-liftover.sh`, `batch-all-liftover.sh`, `batch-strict-liftover.sh`: These "batch" shell scripts were used to run the corresponding liftOver scripts for each cell population analyzed. 
 

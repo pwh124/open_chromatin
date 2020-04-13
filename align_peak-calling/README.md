@@ -1,5 +1,5 @@
 *Data for this directory can be downloaded from Zenodo:*
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253181.svg)](https://doi.org/10.5281/zenodo.3253181)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3253180.svg)](https://doi.org/10.5281/zenodo.3253180)
 
 - `alignment.sh`: Script used to align ATAC-seq data to the mm10 genome. Includes filtering of reads aligned to the mitochondrial genome as well as "unknown" chromosomes and "random" chromosomes. Also removes duplicate reads and improperly paired reads.
 	- Input: sequencing reads (see Table S1)
