@@ -1,0 +1,3 @@
+rsid	lead.snp	vista.chr	vista.start	vista.end	vista.element	vista.nearest.genes
+rs1805203	rs55672338	chr3	180773639	180775802	hs192	DNAJC19,SOX2
+rs1805645	rs34796896	chr3	180773639	180775802	hs192	DNAJC19,SOX2
