@@ -1,0 +1,377 @@
+---
+title: "paintor-analysis"
+author: "Paul Hook"
+date: "11/21/2019"
+output: html_document
+---
+
+The purpose of this script was to process FM results, print tables, save RDSs for further analyses, and produce summary figures.
+```{r, loading-packages}
+library(here)
+library(tidyverse)
+library(reshape2)
+library(patchwork)
+library(Gviz)
+library(org.Hs.eg.db)
+library(motifbreakR)
+library(BSgenome.Hsapiens.UCSC.hg19)
+library(SNPlocs.Hsapiens.dbSNP144.GRCh37)
+library(ggrastr)
+```
+
+# Reading in the data and combining it
+```{r, reading-in-data}
+# Loading all the data including finemapping results with/without and the binary SNP overlap table
+# Setting file paths
+null.path <- here::here("final.all.null.results.txt")
+anno.path <- here::here("final.all.anno.results.txt")
+overlap.path <- here::here("final.all.overlap.txt")
+
+# Loading in finemapping results
+null.mat <- readr::read_delim(null.path,delim = " ")
+anno.mat <- readr::read_delim(anno.path,delim = " ")
+
+# Loading in  the binary overlap matrix, cleaning, and calculating totals for overlap numbers
+overlap.mat <- readr::read_delim(overlap.path,delim = " ") %>%
+  dplyr::select(-chr,-pos,-A1,-A2,-Zscore,-r.squared,-`-log10(P)`) %>%
+  dplyr::mutate(all.sum=rowSums(.[4:30]),
+                enrich.sum=rowSums(.[c(11:14,16:23,30)]))
+
+# Checking # of unique SNPs tested
+length(unique(anno.mat$rsid))
+length(unique(null.mat$rsid))
+
+# Merging
+# Merging finemapping results based on the first 10 columns and renaming the PIP columns
+fm.df <- merge(x=null.mat,y=anno.mat,by=names(null.mat)[1:10]) %>% 
+  as_tibble() %>%
+  dplyr::rename("PIP_null" = Posterior_Prob.x, "PIP_anno" = Posterior_Prob.y)
+
+# Merge finemapping results with binary overlap file and print out
+overlap.df <- merge(x=fm.df,y=overlap.mat,by=c("rsid","id","lead.snp")) %>% 
+  as_tibble()
+
+# Write out SNPs to Lead
+# Making a SNP-to-lead table 
+snps.df <- overlap.df %>%
+  dplyr::select(rsid,lead.snp,A1,A2) %>%
+  dplyr::group_by(rsid,A1,A2) %>%
+  dplyr::summarise(lead.snps=paste(lead.snp,collapse = ","))
+
+write_tsv(snps.df,"revise_results/snps.leadsnps.txt")
+
+# Write
+# Write out just the finemapping results to a table
+print.fm.df <- fm.df %>%
+  dplyr::select(id, everything())
+write_tsv(print.fm.df,"revise_results/Table.S9_fm-results.txt")
+
+# Write out finemapping results + binary overlap matrix
+write.table(overlap.df,file = here::here("revise_results","finemapping_overlap.txt"),quote = FALSE,sep = "\t",row.names = FALSE,col.names = TRUE)
+saveRDS(overlap.df,file = "revise_results/overlap.df.Rds")
+
+# Save all unique SNPs assayed for motifBreakR analysis
+length(unique(fm.df$rsid))
+all.snps <- unique(fm.df$rsid)
+saveRDS(all.snps,file = "revise_results/allVariants.rds")
+```
+
+Determining and saving the SNPs with a PIP >= 0.1 with overlap of a enriched annotation
+```{r}
+# Chunking out only the subset of variants with >= 0.1 and overlap wtih enriched cells
+subset <- overlap.df %>%
+  dplyr::filter((PIP_null >= 0.1 | PIP_anno >= 0.1) & merged.anno.bed == 1) %>%
+  dplyr::select(-merged.anno.bed) %>%
+  dplyr::select(id,chr,pos,rsid,A1,A2,Zscore,lead.snp,everything())
+
+subset.bed <- subset %>%
+  dplyr::select(chr,"start"=pos,rsid,lead.snp) %>%
+  dplyr::mutate(end=start+1) %>%
+  dplyr::select(chr,start,end,rsid,lead.snp) %>%
+  dplyr::group_by(chr,start,end,rsid) %>%
+  dplyr::summarise(lead.snps=paste(lead.snp,collapse = ","))
+
+write_tsv(subset.bed,"revise_results/pip.overlap.snps.bed",col_names = FALSE)
+
+# Number of loci that have a SNP that reaches this criteria and the number of total SNPs that reach this criteria
+length((unique(subset$lead.snp)))
+length(unique(subset$rsid))
+
+# Writing out results
+subset.write <- subset %>%
+  dplyr::select(-id,-chr,-pos,-A1,-A2,-Zscore,-r.squared,-`-log10(P)`,-PIP_null,-PIP_anno)
+write_tsv(subset.write,"revise_results/Table.S11_fm-overlap.txt")
+
+# Saving the variant list
+overlap.snps <- as.character(unique(subset$rsid))
+saveRDS(overlap.snps,file = "revise_results/overlap.snps.Rds")
+```
+
+Checking how the finemapping with and without annotations compare
+
+Calculating 95% sets. These will be large mostly because we set no limit as to how many SNPs can be considered "causal" in each locus
+```{r,95_groups}
+# Calculating the cumulative sum for each locus (highest PIP to lowest PIP)
+sets <- overlap.df %>%
+  dplyr::select(lead.snp,rsid,PIP_null,PIP_anno) %>%
+  dplyr::group_by(lead.snp) %>%
+  dplyr::arrange(-PIP_null) %>%
+  dplyr::mutate(null_ticker=cumsum(PIP_null)) %>%
+  dplyr::arrange(-PIP_anno) %>%
+  dplyr::mutate(anno_ticker=cumsum(PIP_anno))
+
+# Filter and count how many SNPs fall uner the 95% cumsum for null
+tmp.1 <- sets %>%
+  dplyr::group_by(lead.snp) %>%
+  dplyr::filter(null_ticker <= max(null_ticker)*0.95) %>%
+  dplyr::tally() %>%
+  dplyr::rename(n_null=n)
+
+# Filter and count how many SNPs fall uner the 95% cumsum for anno
+tmp.2 <- sets %>%
+  dplyr::group_by(lead.snp) %>%
+  dplyr::filter(anno_ticker <= max(anno_ticker)*0.95) %>%
+  dplyr::tally() %>%
+  dplyr::rename(n_anno=n)
+
+# Merging the cumulative sets by lead.snp
+final.95 <- merge(tmp.1,tmp.2,by="lead.snp")
+
+# How many SNPs fall into these categories (a lot)
+sum(final.95$n_null)
+sum(final.95$n_anno)
+
+# Plotting a locu comparison
+p.sets <- ggplot(data=final.95,aes(x=n_null,y=n_anno))
+q.sets <- p.sets + geom_point(size=2) +
+  ylab("Annotation\nNumber of SNPs in 95% credible sets") +
+  xlab("No annotation\nNumber of SNPs in 95% credible sets") +
+  theme_classic() +
+  #scale_color_manual(values=pip.col) +
+  #labs(color="PIP greater than 0.1") +
+  theme(legend.spacing.y = unit(0.1,'cm'),
+        legend.spacing.x = unit(0.1,'cm'),
+        legend.background = element_blank(),
+        legend.box.background = element_rect(color="black",size = 0.75,fill = "transparent"),
+        legend.key.size = unit(1, 'mm'),
+        legend.position = c(0.85,0.1),
+        legend.text = element_text(family = "Helvetica",face="bold",size=8,color = "black"),
+        legend.title = element_text(family = "Helvetica",face="bold",size=8,color = "black"),
+        axis.title = element_text(family = "Helvetica",face="bold",size = 10,color = "black"),
+        axis.text = element_text(family = "Helvetica",face="bold",size = 8,color = "black"),
+        axis.line = element_line(color="black",size=1),
+        axis.ticks = element_line(color="black",size=1))
+q.sets
+ggsave(q.sets,filename = "revise_results/2019-11-22-19_qsets.pdf",width = 5,height = 5,dpi="print",units = "in")
+```
+
+Comparing the PIPs from both annotation and no annotation
+```{r}
+# Summarizing the finemapping df to see how many SNPs reach the 0.1 threshold with or without annotation
+compare.df <- fm.df %>%
+  dplyr::mutate(color = case_when(PIP_anno >= 0.1 & PIP_null < 0.1 ~ "With annotation",
+                                  PIP_null >= 0.1 & PIP_anno < 0.1 ~ "Without annotation",
+                                  PIP_null >= 0.1 & PIP_anno >= 0.1 ~ "Both",
+                                  PIP_null < 0.1 & PIP_anno < 0.1 ~ "Neither"))
+compare.df$color <- factor(compare.df$color,levels = c("Neither","Without annotation","With annotation","Both"))
+
+# Colors from https://github.com/jakelawlor/PNWColors/
+pip.col <- c(`Neither`="grey70",
+         `Without annotation`="#0f85a0",
+         `With annotation`="#dd4124",
+         `Both`="#ed8b00")
+
+# Plotting the scatter plot comparing the results
+p.pip <- ggplot(data=compare.df,aes(x=PIP_null,y=PIP_anno,color=color))
+q.pip <- p.pip + ggrastr::geom_point_rast(size=1,raster.dpi=320) +
+  ylab("Annotation\nSNP PIPs") +
+  xlab("No annotation\nSNP PIPs") +
+  theme_classic() +
+  scale_color_manual(values=pip.col) +
+  labs(color="PIP greater than 0.1") +
+  theme(legend.spacing.y = unit(0.1,'cm'),
+        legend.spacing.x = unit(0.1,'cm'),
+        legend.background = element_blank(),
+        legend.box.background = element_rect(color="black",size = 0.75,fill = "transparent"),
+        legend.key.size = unit(0.5, 'mm'),
+        legend.position = c(0.85,0.1),
+        legend.text = element_text(family = "Helvetica",face="bold",size=8,color = "black"),
+        legend.title = element_text(family = "Helvetica",face="bold",size=8,color = "black"),
+        axis.title = element_text(family = "Helvetica",face="bold",size = 10,color = "black"),
+        axis.text = element_text(family = "Helvetica",face="bold",size = 8,color = "black"),
+        axis.line = element_line(color="black",size=1),
+        axis.ticks = element_line(color="black",size=1)) +
+  guides(color = guide_legend(override.aes = list(size=2))) +
+  scale_y_continuous(breaks=seq(0,1,0.1)) + scale_x_continuous(breaks=seq(0,1,0.1))
+  
+q.pip
+
+ggsave(q.pip,filename = "revise_results/2019-11-21_PIP-compare.pdf",width = 5,height = 5,dpi="print",units = "in")
+```
+
+Make pie chart in order to illustrate what annotation brings to the table
+```{r}
+# Summarize the compare df by counting the number of SNPs that fall in each category and by calculating the yposition needed to display numbers on eventual Pie charts. This was cobbled together from multiple online sources.
+sum.df <- compare.df %>%
+  dplyr::group_by(color) %>%
+  dplyr::summarise(n=n()) %>%
+  dplyr::arrange(desc(color)) %>%
+  mutate(prop = n/sum(n)*100) %>%
+  mutate(ypos=cumsum(n)-(0.5*n))
+
+# Make the pie chart for all variants
+pie1 <- ggplot(sum.df,aes(x="",y=n,fill=color)) +
+  geom_bar(stat="identity",width=2,color="white") +
+  coord_polar("y",start=45,direction = 1) +
+  theme_void() +
+  theme(legend.position = c(0.9,0.3),
+        legend.title = element_text(face = "bold"),
+        legend.spacing.y = unit(0.1,'cm'),
+        legend.spacing.x = unit(0.1,'cm'),
+        legend.background = element_blank(),
+        legend.text = element_text(face = "bold")) +
+  labs(fill="PIP greater than 0.1") +
+  geom_text(data=subset(sum.df,color=="Neither"),
+           aes(y=ypos,label=n), color = "black",size=10,family="Helvetica") +
+  scale_fill_manual(values=pip.col) +
+  geom_segment(aes(x=2,xend=3,y=0,yend=0),linetype="dashed") +
+  geom_segment(aes(x=2,xend=3,y=1512,yend=5000),linetype="dashed")
+pie1
+
+# Making a summary df excluding the "Neither category" so that we can see how PIPs >= 0.1 breakdown
+sum.pip.df <- sum.df %>% 
+  dplyr::filter(!color=="Neither") %>%
+  dplyr::mutate(prop=n/sum(n)*100) %>%
+  dplyr::mutate(ypos=cumsum(n)-(0.5*n))
+
+# Making the PIP >= 0.1 pie chart
+pie2 <- ggplot(sum.pip.df,aes(x="",y=n,fill=color)) +
+  geom_bar(stat="identity",width=1,color="white") +
+  coord_polar("y",start=0,direction = 1) +
+  theme_void() +
+  theme(legend.position = "none") +
+  geom_text(aes(y=ypos,label=n),color="black",size=10) +
+  scale_fill_manual(values=pip.col)
+
+#Writing out both pie charts
+ggsave("revise_results/2019-11-22_pie1.pdf",plot = pie1,width = 7,height = 7)
+ggsave("revise_results/2019-11-22_pie2.pdf",plot = pie2,width=3,height=3)
+```
+
+Look at SNPs that were fine-mapped in multiple loci
+```{r}
+#Duplicated -- probably will need to address this and talk about how it can lead to additional insights
+idx <- duplicated(fm.df$rsid) | duplicated(fm.df$rsid, fromLast = TRUE) 
+summary(idx)
+dup <- fm.df[idx, ] %>% dplyr::arrange(rsid)
+
+length(unique(dup$rsid))
+length(unique(dup$lead.snp))
+
+dup.tmp <- dup %>%
+  dplyr::filter((PIP_null >= 0.1 | PIP_anno >= 0.1))
+
+idx <- duplicated(dup.tmp$rsid) | duplicated(dup.tmp$rsid, fromLast = TRUE) 
+summary(idx)
+dup.10 <- dup.tmp[idx, ] %>% dplyr::arrange(rsid) %>% dplyr::select(id,everything())
+length(unique(dup.10$lead.snp))
+length(unique(dup.10$rsid))
+
+write_tsv(dup.10,path = "revise_results/Table.S10_duplicated-snps-high-pip.txt")
+```
+
+Combining finemapping results with motifbreaking, pcHiC, and VISTA
+```{r}
+dat <- overlap.df %>%
+  dplyr::select(chr,pos,rsid,lead.snp,PIP_null,PIP_anno,merged.anno.bed) %>%
+  dplyr::mutate(annotate=paste0(rsid,"-",lead.snp))
+
+unique(dat$rsid) %>% length() # 62994 SNPs
+unique(dat$lead.snp) %>% length() # 177 loci
+unique(dat$annotate) %>% length() # 65553 SNPs
+
+# HiC
+## Note all this data was only performed on SNPs with a PIP >= 0.1 and overlap
+hic <- readr::read_tsv("../../../h2_revision/hic/snp-hic-interactions.txt",col_names = FALSE)
+
+hic.snp.df <- hic %>%
+  dplyr::select("rsid"=X4,"lead.snp"=X5) %>%
+  dplyr::mutate(lead.snp = strsplit(as.character(lead.snp),",")) %>%
+  unnest(lead.snp)
+hic.snps <- unique(paste0(hic.snp.df$rsid,"-",hic.snp.df$lead.snp))
+
+## Print out hic reference
+hic.print <- hic %>%
+  dplyr::select("rsid"=X4,"lead.snp"=X5,"frag.chr"=X6,"frag.start"=X7,"frag.end"=X8,"snp.fragment.promoters"=X14,"promoter.fragment"=X9,"promoter.fragment.promoters"=X11,"cells"=X10) %>% 
+  dplyr::mutate(snp.fragment=paste(frag.chr,frag.start,frag.end,sep = ",")) %>%
+  dplyr::select(rsid,lead.snp,snp.fragment,everything(),-frag.chr,-frag.start,-frag.end) %>%
+  {.}
+write_tsv(hic.print,"revise_results/Table.S14_hic-results.txt")
+
+# Motifs
+motifs <- readr::read_tsv("revise_results/Table.S12_motif-results.txt") %>%
+  dplyr::select(rsid,lead.snps) %>%
+  mutate(lead.snps = strsplit(as.character(lead.snps), ",")) %>% 
+  unnest(lead.snps)
+motif.snps <- unique(paste0(motifs$rsid,"-",motifs$lead.snps))
+
+# VISTA results
+vista <- readr::read_tsv("../../../h2_revision/vista/2019-12-4_VISTA-overlaps.txt",col_names = FALSE)
+vista.snps <- unique(paste0(vista$X9,"-",vista$X10))
+
+## Print out reference
+vista.print <- vista %>% 
+  dplyr::select("rsid"=X9,"lead.snp"=X10,"vista.chr"=X1,"vista.start"=X2,"vista.end"=X3,"vista.element"=X4,"vista.nearest.genes"=X5)
+write_tsv(vista.print,"revise_results/Table.S15_VISTA-results.txt")
+
+# Scoring
+dat.score <- dat %>%
+  dplyr::mutate(hic = if_else(annotate %in% hic.snps,1,0),
+                motif = if_else(annotate %in% motif.snps,1,0),
+                vista = if_else(annotate %in% vista.snps,1,0))
+
+# Summarize scoring
+dat.score %>% filter(motif == 1) %>% pull(rsid) %>% unique() %>% length() #163 (183 non-unique)
+dat.score %>% filter(hic == 1) %>% pull(rsid) %>% unique %>% length() #113 (116 non-unique)
+dat.score %>% filter(hic == 1 & motif == 1) %>% pull(rsid) %>% unique() %>% length() #59 (61 non-unique)
+dat.score %>% filter(vista == 1) %>% pull(rsid) %>% unique() %>% length() #2
+```
+
+Now I want to make summary statistics for each locus grouped by lead SNP.
+I want this to include the the total number of SNPs, the number of SNPs that reach certain PIP thresholds, and the number of SNPs that reach a certain PIP threshold and overlap with a feature
+```{r}
+# loading in Pardinas, Supplemental Table 3 (lead.snps + genes)
+pardinas.table <- readxl::read_xlsx("41588_2018_59_MOESM3_ESM.xlsx",sheet = 4,skip = 3)
+snp.genes <- pardinas.table  %>%
+  dplyr::select("lead.snp"=`Index SNP (dbSNP b141)`,"Genes tagged - Pardinas 2018"=`Gene(s) tagged`)
+
+# Produce summary statistics for each locus
+dat.sum <- dat.score %>%
+  dplyr::group_by(lead.snp) %>%
+  dplyr::summarise(n.snps=n(), # all SNPs in the locus
+                   `PIP >= 0.1`=sum(PIP_null >= 0.1 | PIP_anno >= 0.1),
+                   `PIP >= 0.5`=sum(PIP_null >= 0.5 | PIP_anno >= 0.5),
+                   `PIP >= 0.9`=sum(PIP_null >= 0.9 | PIP_anno >= 0.9),
+                   # All SNPs that reach our threshold and overlap
+                   `PIP >= 0.1,overlap`=sum(merged.anno.bed==1 & (PIP_null >= 0.1 | PIP_anno >= 0.1)),
+                   `PIP >= 0.5,overlap`=sum(merged.anno.bed==1 & (PIP_null >= 0.5 | PIP_anno >= 0.5)),
+                   `PIP >= 0.9,overlap`=sum(merged.anno.bed==1 & (PIP_null >= 0.9 | PIP_anno >= 0.9)),
+                   `PIP >= 0.1,overlap,motif`=sum(motif == 1), # Threshold, overlap, and motif
+                   `PIP >= 0.1,overlap,HiC`=sum(hic == 1), # threshold, overlap, and HIC
+                   `PIP >= 0.1,overlap,VISTA`=sum(vista == 1), # Threshold, overlap, and vista - only 1
+                   `PIP >= 0.1,overlap,HiC,motif`=sum(hic == 1 & motif == 1)) %>%
+  dplyr::left_join(snp.genes,by="lead.snp")
+
+summary(dat.sum$`PIP >= 0.1,overlap,HiC`> 0) #43 loci
+summary(dat.sum$`PIP >= 0.1,overlap,motif` > 0) #88 loci
+summary(dat.sum$`PIP >= 0.1,overlap,VISTA` > 0) #2 -- This becomes a figure
+summary(dat.sum$`PIP >= 0.1,overlap,HiC,motif` > 0) #33
+
+sum(dat.sum$`PIP >= 0.1,overlap,motif`) #183
+sum(dat.sum$`PIP >= 0.1,overlap,HiC`) #116
+sum(dat.sum$`PIP >= 0.1,overlap,VISTA`) #2
+sum(dat.sum$`PIP >= 0.1,overlap,HiC,motif`) #61
+
+# Write out the finemapping overlap summary
+write.table(dat.sum,file = here::here("revise_results","Table.S8_fm.locus.summary.txt"),quote = FALSE,sep = "\t",row.names = FALSE,col.names = TRUE)
+```

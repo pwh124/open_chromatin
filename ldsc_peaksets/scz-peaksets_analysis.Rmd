@@ -1,0 +1,246 @@
+---
+title: "ldsc-analysis"
+author: "Paul Hook"
+date: "01-22-2019"
+output: html_document
+---
+
+# Loading needed libraries
+```{r,loading_libraries}
+library(here)
+library(tidyverse)
+library(pheatmap)
+library(RColorBrewer)
+library(patchwork)
+library(readr)
+library(openxlsx)
+```
+
+```{r, loading_data}
+original <- read_tsv("total_original_scz_results.txt")
+prom <- read_tsv("total_prom_scz_results.txt")
+distal <- read_tsv("total_distal_scz_results.txt")
+minus <- read_tsv("total_minus_scz_results.txt") # does not include ex3 because no results are printed
+
+# load in unique and check alone
+# Because I ran this at a different time, they need to be processed differently
+uni <- read_tsv("total_clozuk_unique_results.txt")
+uni$sample1 <- as.character(uni$sample1)
+uni$sample2 <- as.character(uni$sample2)
+uni$Category <- as.character(uni$Category)
+
+# Loading in metadata to annotate
+bedlist <- read_tsv("final.bedList.txt",col_types = "cc")
+uni.names <- merge(bedlist,uni,by.x="number",by.y="sample1")
+
+# Checking that combining everything went well
+summary(is.na(uni.names)) #no NAs which is good
+summary(uni.names$sample1 == uni.names$sample2)
+summary(uni.names$sample1 == uni.names$Category) 
+summary(uni.names$sample2 == uni.names$Category)
+summary(uni.names$number == uni.names$Category)
+
+# Modifying the dataframe so it can be added to the other data
+uni.final <- uni.names %>% 
+  dplyr::select(-number,-sample2,-Category) %>%
+  dplyr::select(file,everything()) %>%
+  dplyr::mutate(file=str_replace_all(file,".bed","")) %>%
+  as_tibble()
+```
+
+```{r, processing_data}
+# Combine original, promoter, distal, and minus results
+total.scz <- bind_rows(original,prom,distal,minus)
+
+# Checking that combining everything went well
+summary(is.na(total.scz)) #no NAs which is good
+summary(total.scz$sample1 == total.scz$sample2)
+summary(total.scz$sample1 == total.scz$Category) 
+summary(total.scz$sample2 == total.scz$Category)
+
+# Renaming and selecting columns
+total.dat <- total.scz %>% 
+  dplyr::select(-sample2,-Category) %>% 
+  dplyr::rename(file=sample1)
+
+# Combining unique data with all the other data
+final.dat <- rbind(total.dat,uni.final)
+
+# Calculating coefficient P-value, -log10 coefficient P-value,
+final.dat <- final.dat %>%
+  mutate(p=pnorm(as.numeric(`Coefficient_z-score`),lower.tail = FALSE)) %>%
+  mutate(p.log10=-log10(p))
+
+# Adding missing row from 'minus' data to dataframe
+minus.row <- c("minus_summits_filter2_ex3_merge_preissl_summits",
+               rep(0,2),
+               "minus",
+               896549,
+               rep(0,12))
+
+# Adding row and making sure columns are numeric
+final.dat <- rbind(final.dat,minus.row) %>% 
+  dplyr::mutate_at(vars(-file,-peaks),as.numeric)
+
+# removing prefixes
+final.dat <- final.dat %>%
+  dplyr::mutate(cell.pop=str_replace_all(file,"minus_|prom_|distal_|original_","")) %>%
+  dplyr::select(cell.pop,peaks,everything(),-file)
+
+# Load cell annotation
+cell.annot <- read_tsv("cell-annot.txt",col_names = c("cell.pop","file","type"))
+
+# merging cell annotation data
+final <- merge(final.dat,cell.annot,by.x = "cell.pop",by.y = "file")
+
+# Selecting which columns we want
+scz.final <- final %>%
+  dplyr::select(cell.pop.y,everything(),-cell.pop) %>%
+  dplyr::rename(cell.pop=cell.pop.y)
+
+# Arranging the columns how I want them
+scz.final$cell_ordered <- factor(scz.final$cell.pop, c("Microglia","Microglia*","Astrocytes*","Oligodendrocytes*","NeuN negative","Excitatory Camk2a","Excitatory Layers II-III","Excitatory Layer IV","Excitatory Layer V","Excitatory Layers II-V*","Excitatory Layer VI","Excitatory Layer VI*","Excitatory DG*","Inhibitory Gad2","Inhibitory*","Inhibitory PV","Inhibitory VIP","Inhibitory MSN*","Embryonic DA forebrain","Embryonic DA midbrain","Cones (blue)","Cones (green)","Rods","CD4 T-cells","CD4 T-cells human","CD8 T-cells","CD8 T-cells human"))
+
+# Check the levels
+levels(scz.final$cell_ordered)
+
+# Arrange 'type' levels
+scz.final$type <- factor(scz.final$type, c("Glia","Excitatory neurons","Inhibitory neurons","Dopaminergic neurons","Retina cells","T-cells"))
+
+levels(factor(scz.final$type))
+
+# Recode peaks
+scz.final <- scz.final %>%
+  dplyr::mutate(set=recode(peaks,
+                           original="All",
+                           prom="Promoter only",
+                           distal="Distal only",
+                           minus="Top annotation removed",
+                           unique="Unique only"))
+```
+
+```{r, setting_themes}
+ldsc_theme <- theme_classic() +
+  theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 1.1,size = 8,family = "Helvetica",color="black",face = "bold"),
+        legend.position ="bottom",
+        plot.title = element_text(hjust = 0.5, face="bold",size=10,family="Helvetica", vjust = -1),
+        axis.text.y = element_text(size = 8,colour = "black",family = "Helvetica",face = "bold"),
+        axis.title.x = element_text(size=10,color = "black",family = "Helvetica",face="bold"),
+        axis.title.y = element_text(size=10,color = "black",family = "Helvetica",face="bold"),
+        panel.grid.major.y = element_line(color = "grey60",linetype = "dashed",size = 0.5),
+        #plot.title = element_blank(),
+        legend.text = element_text(size = 8,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'cm'),
+        legend.spacing.x = unit(0.1,'cm'),
+        #legend.key.size = unit(1,'mm'),
+        legend.background = element_blank())
+
+
+small_ldsc_theme <- theme_classic() +
+  theme(axis.text.x = element_text(angle=45,hjust=1,vjust = 1.1,size = 8,family = "Helvetica",color="black",face=
+                                     "bold"),
+        legend.position ="right",
+        plot.title = element_text(hjust = 0.5, face="bold",size=10,family="Helvetica", vjust = -1),
+        axis.text.y = element_text(size = 6,colour = "black",family = "Helvetica",face="bold"),
+        axis.title.x = element_text(size=6,color = "black",family = "Helvetica"),
+        axis.title.y = element_text(size=8,color = "black",family = "Helvetica"),
+        panel.grid.major.y = element_line(color = "grey80",linetype = "dashed"),
+        #plot.title = element_blank(),
+        legend.text = element_text(size = 6,family = "Helvetica",color = "black"),
+        legend.spacing.y = unit(0.1,'cm'),
+        legend.spacing.x = unit(0.1,'cm'),
+        legend.background = element_blank(),
+        legend.key.size = unit(1, 'mm'))
+``` 
+
+```{r, plotting_data}
+# Setting cell pop colors
+col <- c(`All`="#E41A1C",
+         `Promoter only`="#377EB8",
+         `Distal only`="#4DAF4A",
+         `Top annotation removed`="#984EA3",
+         `Unique only`="#FF7F00")
+
+scz.final$cell_ordered <- with(scz.final, factor(cell_ordered, levels = rev(levels(cell_ordered))))
+
+# Setting peak levels
+scz.final$set<- with(scz.final, factor(set, levels = c("Unique only","Top annotation removed","Distal only","Promoter only","All")))
+
+# Supplemental
+z.plot <- ggplot(scz.final,
+                    aes(fill=set,y=`Coefficient_z-score`, x=cell_ordered)) +
+  geom_hline(yintercept=qnorm((0.05/(27*64)),lower.tail = F),
+             color="blue", linetype="dashed", lwd=0.75, alpha = 0.75) +
+  geom_col(position="dodge",width = 4) +
+  ylab("Regression Z-score") + xlab("") +
+  scale_fill_manual(name = "", values = col) +
+  scale_y_continuous(limits=c(-5,15),expand=c(0,0)) +
+  ldsc_theme +
+  coord_flip() +
+  geom_hline(yintercept=0,color="black", lwd=0.75) +
+  guides(fill = guide_legend(title="Peak set",reverse = TRUE)) +
+  theme(panel.grid.major.y = element_blank(),
+        legend.text=element_text(size=10,family = "Helvetica",face = "bold"),
+        legend.title = element_text(size=10,family = "Helvetica", face = "bold"),
+        axis.text.x = element_text(size=10,family = "Helvetica", face = "bold"),
+        axis.text.y = element_text(size=10,family = "Helvetica", face = "bold"),
+        legend.position = c(0.8,0.1)) +
+  facet_grid(cell_ordered~., scales = "free", space = "free") +
+  theme(strip.background = element_blank(), #remove background for facet labels
+        #panel.border = element_rect(colour = "black", fill = NA,size = 0.5), #add black border
+        panel.spacing = unit(1, "mm"),
+        strip.text.y = element_blank()) #remove space between facets
+
+#p
+p.plot <- ggplot(scz.final,
+                    aes(fill=set,y=p.log10, x=cell_ordered)) +
+  geom_hline(yintercept=-log10(0.05/(27*64)),
+             color="blue", linetype="dashed", lwd=0.75, alpha = 0.75) +
+  geom_col(position="dodge",width = 4) +
+  ylab("-log10(Coefficient P-value)") + xlab("") +
+  scale_fill_manual(name = "", values = col) +
+  scale_y_continuous(limits=c(0,20),expand=c(0,0)) +
+  ldsc_theme +
+  coord_flip() +
+  geom_hline(yintercept=0,color="black", lwd=0.75) +
+  guides(fill = guide_legend(title="Peak set",reverse = TRUE)) +
+  theme(panel.grid.major.y = element_blank(),
+        legend.text=element_text(size=10,family = "Helvetica",face = "bold"),
+        legend.title = element_text(size=10,family = "Helvetica", face = "bold"),
+        axis.text.x = element_text(size=10,family = "Helvetica", face = "bold"),
+        axis.text.y = element_text(size=10,family = "Helvetica", face = "bold"),
+        legend.position = c(0.8,0.1)) +
+  facet_grid(cell_ordered~., scales = "free", space = "free") +
+  theme(strip.background = element_blank(), #remove background for facet labels
+        #panel.border = element_rect(colour = "black", fill = NA,size = 0.5), #add black border
+        panel.spacing = unit(1, "mm"),
+        strip.text.y = element_blank()) #remove space between facets
+
+z.plot
+p.plot
+ggsave("paper.results/2019-11-20_Z-comparison.pdf",plot=z.plot, dpi = "retina", width=7, height=9)
+ggsave("paper.results/2019-11-20_P-comparison.pdf",plot=p.plot, dpi = "retina", width=7, height=9)
+```
+
+# Write out all the results split by peak set
+```{r write_out}
+# I need to write out the results in a more intuitive way
+scz.write <- scz.final %>%
+  dplyr::select(cell.population=cell_ordered,type,set,everything(),-cell.pop,-peaks) %>%
+  arrange(desc(`Coefficient_z-score`)) %>%
+  dplyr::mutate(signif.all=if_else(p.log10 >= -log10(0.05/(27*64)),"yes","no"))
+
+# Checking levels again
+levels(scz.write$cell.population)
+
+# Changing levelsw
+scz.write$set <- factor(scz.write$set, levels = c("All","Promoter only","Distal only", "Top annotation removed","Unique only"))
+levels(scz.write$set)
+
+# Splitting results
+split.results <- split(scz.write,scz.write$set)
+
+# Write them out so each tab is a phenotype result
+# This is Supplemental Table S7
+write.xlsx(split.results, file = here("output","peakset_ldsc-results.xlsx"))
+```

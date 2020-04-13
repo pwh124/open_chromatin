@@ -18,3 +18,8 @@ Beta (signed summary stat)
 
 python ~/my-python-modules/ldsc/munge_sumstats.py --sumstats 4_UK_Biobank_IGAP_17May2018 --merge-alleles ../../../w_hm3.snplist  --out ../Alz_Marioni --N-con 314278 --N-cas 74046
 
+## NOTE ##
+- Since analysis, these summary statistics have been corrected by the original authors. A corrected version of these summary statistics can be found here: https://datashare.is.ed.ac.uk/handle/10283/3364
+- Check https://doi.org/10.1038/s41398-018-0150-6 for more details
+
+

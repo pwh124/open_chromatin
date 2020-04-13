@@ -1,0 +1,204 @@
+---
+title: "motifBreakR"
+author: "Paul Hook"
+date: "10/29/2019"
+output: html_document
+---
+
+The purpose of this script ot to run MotifBreakR analysis
+
+```{r, loading libraries}
+library(here)
+library(tidyverse)
+library(reshape2)
+library(patchwork)
+library(Gviz)
+library(org.Hs.eg.db)
+library(motifbreakR)
+library(BSgenome.Hsapiens.UCSC.hg19)
+library(SNPlocs.Hsapiens.dbSNP144.GRCh37)
+```
+
+
+```{r, reading in variants}
+# Reading in the unique variants that reached a PIP >= 0.1 and intersected with an open chromatin peak from an enriched annotation
+motif.variants <- readRDS("revise_results/overlap.snps.rds")
+
+# Creating the variant table needed for analysis
+variants <- snps.from.rsid(rsid = motif.variants,
+                           dbSNP = SNPlocs.Hsapiens.dbSNP144.GRCh37,
+                           search.genome = BSgenome.Hsapiens.UCSC.hg19)
+
+# Run motifBreakR with hocomoco TFs
+results <- motifbreakR(snpList = variants,
+                       filterp = TRUE,
+                       pwmList = hocomoco,
+                       threshold = 1e-4,
+                       method = "ic",
+                       bkg = c(A=0.25, C=0.25, G=0.25, T=0.25),
+                       BPPARAM = BiocParallel::bpparam())
+
+# Save results just because they take a bit to run
+saveRDS(results,"revise_results/gr.hocomoco.v10.results.rds")
+
+# Converting to a dataframe
+#results <- readRDS("revise_results/gr.hocomoco.v10.results.rds")
+results$snp <- names(results)
+results.df <- data.frame(results)
+
+# How many SNPs?
+length(unique(results.df$snp)) # 168
+select.nsnps <- length(unique(results.df$snp))
+
+# Load SNP to lead SNP key
+snp2lead <- read_tsv("revise_results/snps.leadsnps.txt")
+#results <- readRDS("revise_results/gr.hocomoco.v10.results.rds")
+#results$snp <- names(results)
+#results.df <- data.frame(results)
+
+# Making a readable SNP table of all results
+tf.table <- results.df %>%
+  dplyr::select("rsid"=snp,"snp.chr"=seqnames,"snp.pos"=snpPos,'ref'=REF,
+                "alt"=ALT,geneSymbol,effect,dataSource,
+                providerName,"providerID"=providerId,seqMatch,
+                "motif.start"=start,"motif.end"=end) %>%
+  dplyr::mutate(rsid=str_remove(rsid,":.*")) %>%
+  dplyr::left_join(snp2lead,by='rsid') %>%
+  dplyr::filter(alt == A1) %>% #Make sure the alleles match - it should remove a few multi-allelic snps
+  dplyr::select(rsid,lead.snps,everything(),-A1,-A2)
+
+length(unique(tf.table$rsid)) #163 SNPs
+
+write_tsv(tf.table, "revise_results/Table.S12_motif-results.txt")
+
+# Number of loci with at least 1 SNP that reaches a PIP of 0.1, overlaps with a SZ enriched open chromatin region, and disrupts a TF binding site. Have to split them by comma in order to get a proper count since some SNPs reside in mutliple loci.
+length(unique(unlist(strsplit(tf.table$lead.snps,",")))) #88
+```
+
+Writing out a TF list and comparing it to all SNPs finemapped to look for enrichment
+```{r}
+# Making a TF frequency list from the analysis above
+# Filtering unique SNP TF pairs
+select.tf <- tf.table %>%
+  dplyr::select(rsid,geneSymbol) %>%
+  unique()
+length(unique(select.tf$geneSymbol))
+
+# Converting SNP-TF pairs to frequency data frame
+select.tf.df <- as.data.frame.table(table(select.tf$geneSymbol)) %>%
+  dplyr::arrange(-Freq) %>%
+  dplyr::rename("geneSymbol"=Var1,"select.freq"=Freq)
+
+# Making a TF frequency list from all the SNPs that were finemapped (excluding those above)
+# Loading all data
+all.results <- readRDS("revise_results/allResults.Rds") #load data
+all.results$snp <- names(all.results) #add rownames to a metadata column
+all.results.df <- data.frame(all.results)
+
+# Remove all SNPs that don't have matching alleles
+all.df <- all.results.df %>%
+  dplyr::select("rsid"=snp,"chr"=seqnames,"pos"=snpPos,'ref'=REF,
+                "alt"=ALT,geneSymbol,effect,dataSource,
+                providerName,"providerID"=providerId,seqMatch) %>%
+  dplyr::mutate(rsid=str_remove(rsid,":.*")) %>%
+  dplyr::left_join(snp2lead,by='rsid') %>%
+  dplyr::filter(alt == A1) %>% #Make sure the alleles match - it should remove a few multi-allelic snps - only keep results from the correct alleles
+  dplyr::select(rsid,lead.snps,everything())
+
+# Counting # of snps
+all.nsnps <- length(unique(all.df$rsid)) #38697
+
+# Counting all SNP disruptions
+all.tfs <- all.df %>%
+  dplyr::select(rsid,geneSymbol) %>%
+  unique()
+length(unique(all.tfs$geneSymbol)) #374 unique TFs
+
+# Making a frequency table
+all.tf.df <- as.data.frame.table(table(all.tfs$geneSymbol)) %>%
+  dplyr::arrange(-Freq) %>%
+  dplyr::rename("geneSymbol"=Var1,"all.freq"=Freq)
+
+# Merging the selected SNP table and 
+tf.compare <- merge(select.tf.df,all.tf.df,by="geneSymbol") %>%
+  dplyr::mutate(all.prob=all.freq/all.nsnps)
+
+# Using the pbinom and asking based on a bionomial distribution, what the probability of picking select.freq or more out of 163 trials (picking motifs for 163 SNPs).
+b.test <- tf.compare %>%
+  rowwise() %>%
+  mutate(p=1-binom.test(select.freq,163,p=all.prob,alternative="l")$p.value) %>%
+  arrange(p) %>%
+  dplyr::rename("overlap.snp.freq"=select.freq,
+                "all.snp.freq"= all.freq,
+                "all.snp.prob"= all.prob,
+                "binomial.p" = p)
+
+summary(b.test$binomial.p <= 0.01) # 11 TFs reach a nominal significant enrichment of 0.01
+# More SNPs than you would expect with random draws disrupt 13 transcription factors
+summary(b.test$binomial.p <= (0.01/251)) # None reach a bonferroni corrected significance
+#write out
+write_tsv(b.test,"revise_results/Table.S13_tf-freq-test.txt") 
+```
+
+Making TF motif disruption figures
+```{r}
+# Need to use GR object produced by motifbreakR
+motif.plot.gr <- results
+
+# Making a plot
+snp.gr <- motif.plot.gr[names(motif.plot.gr) == "rs181813160"]
+ngef.results <- snp.gr[(elementMetadata(snp.gr)[, "providerName"] %in% c('ZN148_si','SP1_f2','KLF15_f1','EGR1_f2'))]
+plotMB(ngef.results, "rs181813160",reverseMotif = TRUE, effect = "strong")
+# Something is slightly wrong with plotMB() in that it is impossible to save the image through R. Might just have to export this using RStudio as a PDF after plotting in R
+```
+
+```{r}
+# Loading libraries
+library(here)
+library(tidyverse)
+library(reshape2)
+library(patchwork)
+library(Gviz)
+library(org.Hs.eg.db)
+library(motifbreakR)
+library(BSgenome.Hsapiens.UCSC.hg19)
+library(SNPlocs.Hsapiens.dbSNP144.GRCh37)
+
+# Load RDS
+results<- readRDS("revise_results/gr.hocomoco.v10.results.rds")
+
+# Need to use GR object produced by motifbreakR
+motif.plot.gr <- results
+
+# Making a plot
+dev.off()
+plotMB(motif.plot.gr, "rs1805203",reverseMotif = TRUE, effect = "strong")
+# Something is slightly wrong with plotMB() in that it is impossible to save the image through R. Might just have to export this using RStudio as a PDF after plotting in R
+```
+
+```{r}
+# Loading libraries
+library(here)
+library(tidyverse)
+library(reshape2)
+library(patchwork)
+library(Gviz)
+library(org.Hs.eg.db)
+library(motifbreakR)
+library(BSgenome.Hsapiens.UCSC.hg19)
+library(SNPlocs.Hsapiens.dbSNP144.GRCh37)
+
+# Load RDS
+results<- readRDS("revise_results/gr.hocomoco.v10.results.rds")
+
+# Need to use GR object produced by motifbreakR
+motif.plot.gr <- results
+
+# Making a plot
+dev.off()
+plotMB(motif.plot.gr, "rs2565064",reverseMotif = FALSE, effect = "strong")
+# Something is slightly wrong with plotMB() in that it is impossible to save the image through R. Might just have to export this using RStudio as a PDF after plotting in R
+```
+
+
+```

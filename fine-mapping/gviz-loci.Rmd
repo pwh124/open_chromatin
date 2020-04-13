@@ -1,0 +1,301 @@
+---
+title: "gviz-attempt"
+author: "Paul Hook"
+date: "12/2/2019"
+output: html_document
+---
+
+#Loading packages needed
+```{r}
+library(Gviz)
+library(tidyverse)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+library(rtracklayer)
+library(org.Hs.eg.db)
+```
+
+#Loading in data
+```{r}
+peak.dir <- "/Volumes/PAULHOOK/2019_open-chromatin/Paper/zenodo_final/hg19_final_peaks/"
+setwd(peak.dir)
+
+cell.annot <- "/Volumes/PAULHOOK/2019_open-chromatin/h2_revision/cell-annot.txt"
+snps <- "/Volumes/PAULHOOK/2019_open-chromatin/Paper/ambig_finemapping/results/final.all.anno.results.txt"
+
+# Making a SNP GR object
+snp.df <- read.table(snps,sep=" ",header = TRUE)
+
+snp.gr <- GRanges(seqnames = snp.df$chr,
+                  ranges = IRanges(start=snp.df$pos,
+                                   end = snp.df$pos + 1,
+                                   names = snp.df$rsid))
+
+# Making annotation object
+annotation <- read.table(cell.annot,
+                         sep = "\t",
+                         col.names = c("track_name","file_name","cell_type"))
+
+# Setting the colors for each track
+annotation <- annotation %>%
+  dplyr::mutate(color=case_when(
+    cell_type == "Glia" ~ "#4DAF4A",
+    cell_type == "Excitatory neurons" ~ "#377EB8",
+    cell_type == "Inhibitory neurons" ~ "#984EA3",
+    cell_type == "Dopaminergic neurons" ~ "#E41A1C",
+    cell_type == "Retina cells" ~ "#FF7F00",
+    cell_type == "T-cells" ~ "#F781BF")
+  )
+
+# Make a vector with desired order to track_names to mirror LDSC and other parts of the paper
+track_name <- c("Microglia","Microglia*","Astrocytes*","Oligodendrocytes*","NeuN negative","Excitatory Camk2a","Excitatory Layers II-III","Excitatory Layer IV","Excitatory Layer V","Excitatory Layers II-V*","Excitatory Layer VI","Excitatory Layer VI*","Excitatory DG*","Inhibitory Gad2","Inhibitory*","Inhibitory PV","Inhibitory VIP","Inhibitory MSN*","Embryonic DA forebrain","Embryonic DA midbrain","Cones (blue)","Cones (green)","Rods","CD4 T-cells","CD4 T-cells human","CD8 T-cells","CD8 T-cells human")
+
+# Use match to order the annotation data frame by the list above
+ann.ordered <- annotation[match(track_name, annotation$track_name),]
+
+# Making vectors to process the results
+bed_file <- paste0(ann.ordered$file_name,".bed")
+track_name <- as.character(str_replace_all(ann.ordered$track_name," ","-"))
+color_list <- ann.ordered$color
+```
+
+# I want to make a visualization of hs192 (chr3:180773639-180775802) - SOX2OT
+```{r}
+# Setting chr and genome for tracks
+chr <- 'chr3'
+gen <- 'hg19'
+gtrack <- GenomeAxisTrack(fontfamily = "Helvetica",
+                          fontface= "bold",
+                          fontsize=14,
+                          cex=1,
+                          col="black")
+itrack <- IdeogramTrack(genome = gen, chromosome = chr,
+                        fontfamily = "Helvetica",
+                        fontcolor = "black",
+                        fontface = "bold",
+                        fontsize=10,
+                        cex=1)
+
+# Making a gene track
+ucscGenes <- UcscTrack(genome=gen,
+                       table="wgEncodeGencodeCompV19",
+                       track = 'GENCODE Genes V19',trackType="GeneRegionTrack",
+                       chromosome=chr, rstarts = "exonStarts", rends = "exonEnds",
+                       gene = 'name2', symbol = 'name2', transcript = "name",strand = "strand",
+                       stacking = 'pack', showID = TRUE, geneSymbol = TRUE,
+                       name="GENCODE V19 genes")
+
+displayPars(ucscGenes) <- list(col=NULL,col.axis="black",background.title="white",fontcolor.title="black",fill="black",col.line="black",fontfamily="Helvetica",fontcolor.group="black",fontsize.group=10,fontsize.title=10,fontface=1,cex.group=1,just.group="left",rotation.title=0)
+
+# Making BED tracks
+counter = 0
+for (file in bed_file){
+  counter = counter + 1
+  assign(x=track_name[counter],
+         value=AnnotationTrack(subset(import.bed(bed_file[counter]),seqnames==chr),
+                               name = track_name[counter],
+                               col=NULL, fontfamily="Helvetica",
+                               background.title=color_list[counter],
+                               fontcolor.title="black",
+                               fill=color_list[counter],
+                               fontsize.title=10,cex.title=1,
+                               frame=TRUE, rotation.title=0,stackHeight=0.5)
+         )
+}
+
+# Making a VISTA TRACK
+vista <- import.bed("/Volumes/PAULHOOK/2019_open-chromatin/h2_revision/vista/VISTA-positive-R.bed")
+vista.track <- AnnotationTrack(vista,
+                               chromosome=chr, genome = gen,
+                               group=vista$name,
+                               name = "VISTA-positive-elements",
+                               col=NULL, fontfamily="Helvetica",
+                               background.title="#DCDCDC",
+                               fontcolor.title="black",
+                               fill="blue",
+                               fontsize.title=9,cex.title=1,
+                               #frame=TRUE,
+                               rotation.title=0,
+                               stackHeight=0.5,
+                               groupAnnotation="group",
+                               just.group="left",fontcolor.group="black",
+                               fontsize.group=10,cex.group=1)
+
+# Making a SNP track
+snp.track <- AnnotationTrack(subset(snp.gr,seqnames==chr),
+                               chromosome=chr, genome = gen,
+                               group=names(subset(snp.gr,seqnames==chr)),
+                               name = "Fine-mapped-SNPs",
+                               col=NULL, fontfamily="Helvetica",
+                               background.title="#DCDCDC",
+                               fontcolor.title="black",
+                               fill="black",
+                               fontsize.title=9,cex.title=1,
+                               #frame=TRUE,
+                               rotation.title=0,
+                               stackHeight=2,
+                               groupAnnotation="group",
+                               just.group="left",fontcolor.group="black",
+                               fontsize.group=8,cex.group=1)
+
+
+#build list for plotTracks
+my_list <- list(gtrack,ucscGenes,vista.track,snp.track)
+for (i in 1:length(bed_file)){ my_list[[i+4]] <- get(track_name[i])}
+  
+#coordinates for beta actin
+pdf(file="/Volumes/PAULHOOK/2019_open-chromatin/h2_revision/vista/2019-12-12_sox2-ot.locus.pdf",height = 8,width = 7)
+plotTracks(my_list, from=180773639, to=180775802,title.width = 6,transcriptAnnotation = "symbol",extend.right = 500,extend.left = 500,scale=0.15, main = "chr3:180773639-180775802")
+dev.off()
+```
+
+# I want to make a visualization of NGEF promoter - chr2:233792142-233794140 - NGEF
+# And C2orf82 3' UTR - chr2:233742306-233743814
+```{r}
+# Setting chr and genome for tracks
+chr <- 'chr2'
+gen <- 'hg19'
+gtrack <- GenomeAxisTrack(fontfamily = "Helvetica",
+                          fontface= "bold",
+                          fontsize=14,
+                          cex=1,
+                          col="black")
+itrack <- IdeogramTrack(genome = gen, chromosome = chr,
+                        fontfamily = "Helvetica",
+                        fontcolor = "black",
+                        fontface = "bold",
+                        fontsize=10,
+                        cex=1)
+
+# Making a gene track
+ucscGenes <- UcscTrack(genome="hg19",
+                       table="wgEncodeGencodeCompV19",
+                       track = 'GENCODE Genes V19',trackType="GeneRegionTrack",
+                       chromosome=chr, rstarts = "exonStarts", rends = "exonEnds",
+                       gene = 'name2', symbol = 'name2', transcript = "name",strand = "strand",
+                       stacking = 'pack', showID = TRUE, geneSymbol = TRUE,
+                       name="GENCODE V19 genes")
+
+displayPars(ucscGenes) <- list(col=NULL,col.axis="black",background.title="white",fontcolor.title="black",fill="black",col.line="black",fontfamily="Helvetica",fontcolor.group="black",fontsize.group=10,fontsize.title=10,fontface=1,cex.group=1,just.group="right",rotation.title=0)
+
+# Making BED tracks
+counter = 0
+for (file in bed_file){
+  counter = counter + 1
+  assign(x=track_name[counter],
+         value=AnnotationTrack(subset(import.bed(bed_file[counter]),seqnames==chr),
+                               name = track_name[counter],
+                               col=NULL, fontfamily="Helvetica",
+                               background.title=color_list[counter],
+                               fontcolor.title="black",
+                               fill=color_list[counter],
+                               fontsize.title=10,cex.title=1,
+                               frame=TRUE, rotation.title=0,stackHeight=0.5)
+         )
+}
+
+
+# Making a SNP track
+snp.track <- AnnotationTrack(subset(snp.gr,seqnames==chr),
+                               chromosome=chr, genome = gen,
+                               group=names(subset(snp.gr,seqnames==chr)),
+                               name = "Fine-mapped-SNPs",
+                               col=NULL, fontfamily="Helvetica",
+                               background.title="#DCDCDC",
+                               fontcolor.title="black",
+                               fill="black",
+                               fontsize.title=9,cex.title=1,
+                               #frame=TRUE,
+                               rotation.title=0,
+                               stackHeight=2,
+                               groupAnnotation="group",
+                               just.group="left",fontcolor.group="black",
+                               fontsize.group=8,cex.group=1)
+
+
+#build list for plotTracks
+my_list <- list(gtrack,ucscGenes,snp.track)
+for (i in 1:length(bed_file)){ my_list[[i+3]] <- get(track_name[i])}
+  
+#coordinates for beta actin
+pdf(file="/Volumes/PAULHOOK/2019_open-chromatin/Paper/ambig_finemapping/results/revise_results/2019-12-12_ngef-locus.pdf",height = 7,width = 6)
+plotTracks(my_list, from=233792142, to=233794140,title.width = 5,transcriptAnnotation = "symbol",extend.right = 200,extend.left = 500,scale=0.15,main = "chr2:233792142-233794140")
+dev.off()
+
+pdf(file="/Volumes/PAULHOOK/2019_open-chromatin/Paper/ambig_finemapping/results/revise_results/2019-12-12_ngef-locus-c2orf82.pdf",height = 8,width = 6)
+plotTracks(my_list, from=233742306, to=233743814,title.width = 5,transcriptAnnotation = "symbol",extend.right = 1000,extend.left = 1000,scale=0.15,main = "chr2:233742306-233743814")
+dev.off()
+```
+
+# I want to make a visualization of CHRNA2 promoter - chr8:27326894-27328396
+```{r}
+# Setting chr and genome for tracks
+chr <- 'chr8'
+gen <- 'hg19'
+gtrack <- GenomeAxisTrack(fontfamily = "Helvetica",
+                          fontface= "bold",
+                          fontsize=14,
+                          cex=1,
+                          col="black")
+itrack <- IdeogramTrack(genome = gen, chromosome = chr,
+                        fontfamily = "Helvetica",
+                        fontcolor = "black",
+                        fontface = "bold",
+                        fontsize=10,
+                        cex=1)
+
+# Making a gene track
+ucscGenes <- UcscTrack(genome="hg19",
+                       table="wgEncodeGencodeCompV19",
+                       track = 'GENCODE Genes V19',trackType="GeneRegionTrack",
+                       chromosome=chr, rstarts = "exonStarts", rends = "exonEnds",
+                       gene = 'name2', symbol = 'name2', transcript = "name",strand = "strand",
+                       stacking = 'pack', showID = TRUE, geneSymbol = TRUE,
+                       name="GENCODE V19 genes")
+
+displayPars(ucscGenes) <- list(col=NULL,col.axis="black",background.title="white",fontcolor.title="black",fill="black",col.line="black",fontfamily="Helvetica",fontcolor.group="black",fontsize.group=10,fontsize.title=10,fontface=1,cex.group=1,just.group="right",rotation.title=0)
+
+# Making BED tracks
+counter = 0
+for (file in bed_file){
+  counter = counter + 1
+  assign(x=track_name[counter],
+         value=AnnotationTrack(subset(import.bed(bed_file[counter]),seqnames==chr),
+                               name = track_name[counter],
+                               col=NULL, fontfamily="Helvetica",
+                               background.title=color_list[counter],
+                               fontcolor.title="black",
+                               fill=color_list[counter],
+                               fontsize.title=10,cex.title=1,
+                               frame=TRUE, rotation.title=0,stackHeight=0.5)
+         )
+}
+
+
+# Making a SNP track
+snp.track <- AnnotationTrack(subset(snp.gr,seqnames==chr),
+                               chromosome=chr, genome = gen,
+                               group=names(subset(snp.gr,seqnames==chr)),
+                               name = "Fine-mapped-SNPs",
+                               col=NULL, fontfamily="Helvetica",
+                               background.title="#DCDCDC",
+                               fontcolor.title="black",
+                               fill="black",
+                               fontsize.title=9,cex.title=1,
+                               #frame=TRUE,
+                               rotation.title=0,
+                               stackHeight=2,
+                               groupAnnotation="group",
+                               just.group="left",fontcolor.group="black",
+                               fontsize.group=8,cex.group=1)
+
+
+#build list for plotTracks
+my_list <- list(gtrack,ucscGenes,snp.track)
+for (i in 1:length(bed_file)){ my_list[[i+3]] <- get(track_name[i])}
+  
+#coordinates for beta actin
+pdf(file="/Volumes/PAULHOOK/2019_open-chromatin/Paper/ambig_finemapping/results/revise_results/2019-12-12_CHRNA2-locus.pdf",height = 8,width = 7)
+plotTracks(my_list, from=27325391, to=27329899,title.width = 3,transcriptAnnotation = "symbol",extend.right = 500,extend.left = 500,scale=0.15,main = "chr8:27326894-27328396")
+dev.off()
+
+```
