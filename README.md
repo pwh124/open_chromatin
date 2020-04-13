@@ -2,7 +2,7 @@
 
 This is the repositiory the for paper entitled:
    
-###Leveraging mouse chromatin data for heritability enrichment informs common disease architecture and reveals cortical layer contributions to schizophrenia  
+### Leveraging mouse chromatin data for heritability enrichment informs common disease architecture and reveals cortical layer contributions to schizophrenia  
 
 Published manuscript:  To be updated soon  
 bioRxiv version: [https://doi.org/10.1101/427484](https://doi.org/10.1101/427484)  
@@ -20,9 +20,9 @@ Please contact me at phook2 [at] jhmi.edu with any questions or comments.
 
 - **align_peak-calling**: Contains code pertaining to the alignment of ATAC-seq reads, the calling of open chromatin peaks, and the visualization of this data   - **annotations**: Contains code pertaining to processing of promoter-capture Hi-C data and VISTA Enhancer Browser data  - **fine-mapping**: Contains code pertaining to the set-up, execution, and analysis of fine-mapping of schizophrenia SNPs  - **jaccard_comparisons** Contains code pertaining to the download of Roadmap Epigenomics Project open chromatin data and the base pair level pairwise comparisons performed in the manuscript  - **ldsc**: Contains code pertaining to the set-up, execution, and analysis of heritability enrichment analyses performed with LDSC using mouse-derived human open chromatin profiles  - **ldsc_peaksets**: Contains code pertaining to the set-up, execution, and analysis of heritability enrichment analyses performed with LDSC using subsets of mouse-derived human open chromatin profiles. Some code used for this analysis will be in the "ldsc/" directory  - **liftover**: Contains code pertaining to the conversion of mouse open chromatin profiles to human open chromtain profiles    - **peak_comparisons**: Contains code pertaining to the peak level comparisons of mouse-derived human open chromatin profiles and human open chromatin profiles  - **sc\_read\_extraction**: Contains code and some key files pertaining to the extraction of single-nuclei ATAC-seq reads belonging to clusters of cell populations from "Single-nucleus analysis of accessible chromatin in developing mouse forebrain reveals cell-type-specific transcriptional regulation" (Preissl, 2018)  
 
-####Note: More details for all the scripts within each folder is provided by the `README.md` in each folder  
+#### Note: More details for all the scripts within each folder is provided by the `README.md` in each folder  
 
-####Data can be found here on Zenodo here with the prefix "gr_":  [https://doi.org/10.5281/zenodo.3253180](https://doi.org/10.5281/zenodo.3253180)  
+#### Data can be found here on Zenodo here with the prefix "gr_":  [https://doi.org/10.5281/zenodo.3253180](https://doi.org/10.5281/zenodo.3253180)  
   
 -----  
 -----  
