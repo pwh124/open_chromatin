@@ -4,7 +4,7 @@ This is the repositiory the for paper entitled:
    
 ### Leveraging mouse chromatin data for heritability enrichment informs common disease architecture and reveals cortical layer contributions to schizophrenia  
 
-Published manuscript: [https://genome.cshlp.org/content/30/4/528](https://genome.cshlp.org/content/30/4/528) 
+Published manuscript: [https://genome.cshlp.org/content/30/4/528](https://genome.cshlp.org/content/30/4/528)  
 bioRxiv version: [https://doi.org/10.1101/427484](https://doi.org/10.1101/427484)  
 Note: There were substantial changes betweent the preprint and published versions.
 
